@@ -3,349 +3,97 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MediAid — Live Outbreak Radar | Community Health Intelligence</title>
+<title>MediAid — Outbreak Radar | Live Community Health Intelligence</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #f0f4f3;
-    color: #1a1a1a;
-    min-height: 100vh;
-  }
-
-  header {
-    background: #0d6e6e;
-    color: #fff;
-    padding: 1.5rem 2rem;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  }
-
-  .header-inner {
-    max-width: 960px;
-    margin: 0 auto;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
-  header p  { font-size: 0.8rem; opacity: 0.8; margin-top: 0.2rem; }
-
-  .live-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 0.75rem;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .live-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #4ade80;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.3; }
-  }
-
-  main {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-  }
-
-  .meta-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 0.78rem;
-    color: #5f5e5a;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  #last-updated { color: #0d6e6e; font-weight: 500; }
-
-  .disclaimer {
-    background: #e1f5ee;
-    border-left: 3px solid #0d6e6e;
-    border-radius: 0 8px 8px 0;
-    padding: 0.6rem 1rem;
-    font-size: 0.75rem;
-    color: #085041;
-    margin-bottom: 1.5rem;
-  }
-
-  /* ── Totals strip ── */
-  .totals {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-    margin-bottom: 1.5rem;
-  }
-
-  .total-card {
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #d3d1c7;
-    padding: 1rem 1.25rem;
-    text-align: center;
-  }
-
-  .total-num   { font-size: 2rem; font-weight: 600; color: #0d6e6e; line-height: 1; }
-  .total-label { font-size: 0.72rem; color: #888780; margin-top: 4px; }
-
-  .total-num.red    { color: #a32d2d; }
-  .total-num.amber  { color: #ba7517; }
-
-  /* ── Village cards ── */
-  .village-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #d3d1c7;
-    padding: 1.25rem;
-    transition: box-shadow 0.2s;
-  }
-
-  .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-  }
-
-  .village-name  { font-size: 1rem; font-weight: 600; }
-  .village-sub   { font-size: 0.72rem; color: #888780; margin-top: 2px; }
-
-  .alert-pill {
-    font-size: 0.68rem;
-    font-weight: 600;
-    border-radius: 999px;
-    padding: 3px 10px;
-    flex-shrink: 0;
-  }
-
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f8fafb; color: #1a1a1a; }
+  header { background: #0d6e6e; color: white; padding: 1.5rem 2rem; }
+  header h1 { font-size: 1.4rem; font-weight: 600; }
+  header p { font-size: 0.85rem; opacity: 0.85; margin-top: 0.25rem; }
+  .badge { display: inline-block; background: rgba(255,255,255,0.2);
+           border-radius: 999px; padding: 2px 10px; font-size: 0.75rem;
+           margin-top: 0.5rem; }
+  main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+  .meta { font-size: 0.8rem; color: #666; margin-bottom: 1.5rem; }
+  #last-updated { font-weight: 500; color: #0d6e6e; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 1rem; margin-bottom: 2rem; }
+  .card { background: white; border-radius: 12px; border: 1px solid #e5e7eb;
+          padding: 1.25rem; }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start;
+                 margin-bottom: 1rem; }
+  .village-name { font-size: 1rem; font-weight: 600; }
+  .alert-badge { font-size: 0.7rem; font-weight: 600; border-radius: 999px;
+                 padding: 3px 10px; }
   .NORMAL   { background: #e1f5ee; color: #085041; }
   .ELEVATED { background: #faeeda; color: #633806; }
   .OUTBREAK { background: #fcebeb; color: #791f1f; }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 1rem;
-  }
-
-  .stat-box {
-    background: #f0f4f3;
-    border-radius: 8px;
-    padding: 0.6rem 0.75rem;
-  }
-
-  .stat-num   { font-size: 1.5rem; font-weight: 600; color: #0d6e6e; line-height: 1; }
-  .stat-num.r { color: #a32d2d; }
-  .stat-num.a { color: #ba7517; }
-  .stat-label { font-size: 0.68rem; color: #888780; margin-top: 3px; }
-
-  /* ── Stacked bar ── */
-  .dist-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.7rem;
-    color: #888780;
-    margin-bottom: 4px;
-    margin-top: 0.75rem;
-  }
-
-  .dist-bar {
-    display: flex;
-    height: 8px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: #e5e7eb;
-  }
-
-  .seg-green { background: #1d9e75; }
-  .seg-amber { background: #ef9f27; }
-  .seg-red   { background: #e24b4a; }
-
-  .dist-legend {
-    display: flex;
-    gap: 12px;
-    margin-top: 6px;
-    flex-wrap: wrap;
-  }
-
-  .leg {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.68rem;
-    color: #5f5e5a;
-  }
-
-  .leg-dot {
-    width: 8px; height: 8px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .sync-time {
-    font-size: 0.68rem;
-    color: #b4b2a9;
-    margin-top: 1rem;
-    border-top: 1px solid #f1efe8;
-    padding-top: 0.6rem;
-  }
-
-  /* ── Chart section ── */
-  .chart-section {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #d3d1c7;
-    padding: 1.25rem;
-    margin-bottom: 2rem;
-  }
-
-  .chart-title {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: #5f5e5a;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 1rem;
-  }
-
-  /* ── States ── */
-  .loading-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #888780;
-    font-size: 0.9rem;
-  }
-
-  .spinner {
-    width: 32px; height: 32px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #0d6e6e;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 1rem;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .error-box {
-    background: #fcebeb;
-    color: #791f1f;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    font-size: 0.85rem;
-    margin: 1rem 0;
-  }
-
-  footer {
-    text-align: center;
-    font-size: 0.72rem;
-    color: #b4b2a9;
-    padding: 1.5rem 1rem 2rem;
-    border-top: 1px solid #d3d1c7;
-  }
-
-  footer a { color: #0d6e6e; text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: #f8fafb; border-radius: 8px; padding: 0.6rem 0.75rem; }
+  .stat-num { font-size: 1.4rem; font-weight: 600; }
+  .stat-label { font-size: 0.7rem; color: #666; margin-top: 2px; }
+  .green { color: #0d6e6e; } .amber { color: #ba7517; } .red { color: #a32d2d; }
+  .bar-row { margin-top: 1rem; }
+  .bar-label { font-size: 0.72rem; color: #666; display: flex;
+               justify-content: space-between; margin-bottom: 3px; }
+  .bar-track { background: #f0f0f0; border-radius: 999px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width 0.8s ease; }
+  .bar-green { background: #1d9e75; } .bar-amber { background: #ef9f27; }
+  .bar-red { background: #e24b4a; }
+  .totals { background: white; border-radius: 12px; border: 1px solid #e5e7eb;
+            padding: 1.25rem; margin-bottom: 2rem; }
+  .totals h2 { font-size: 0.85rem; font-weight: 600; color: #666;
+               text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+  .totals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                 gap: 1rem; }
+  .total-stat { text-align: center; }
+  .total-num { font-size: 2rem; font-weight: 600; color: #0d6e6e; }
+  .total-label { font-size: 0.75rem; color: #666; margin-top: 4px; }
+  footer { text-align: center; font-size: 0.75rem; color: #999;
+           padding: 2rem 1rem; border-top: 1px solid #e5e7eb; margin-top: 2rem; }
+  .loading { text-align: center; padding: 3rem; color: #666; }
+  .error { background: #fcebeb; color: #791f1f; border-radius: 8px;
+           padding: 1rem; margin: 1rem 0; font-size: 0.85rem; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="header-inner">
-    <div>
-      <h1>MediAid — Outbreak Radar</h1>
-      <p>Live community health intelligence · Baligham &amp; Bagam · Cameroon</p>
-    </div>
-    <div class="live-badge">
-      <div class="live-dot"></div>
-      Live data
-    </div>
-  </div>
+  <h1>MediAid — Outbreak Radar</h1>
+  <p>Live community health intelligence · Baligham &amp; Bagam · North West &amp; West Regions, Cameroon</p>
+  <span class="badge">Open Data · Anonymised Aggregates · No patient data</span>
 </header>
 
 <main>
-  <div class="meta-bar">
-    <span>Data updates when CHAs sync after each screening session.</span>
-    <span>Last updated: <span id="last-updated">loading…</span></span>
-  </div>
+  <p class="meta">
+    Data updates when Community Health Aides sync after each screening session.
+    Last updated: <span id="last-updated">loading…</span>
+  </p>
 
-  <div class="disclaimer">
-    All data is anonymised aggregate counts by village — no patient identifiers, no GPS coordinates.
-    Raw sensor data never leaves the device. Geohash precision: ~20 km radius.
-  </div>
-
-  <!-- Totals -->
-  <div class="totals" id="totals-strip">
-    <div class="loading-state" style="grid-column:1/-1">
-      <div class="spinner"></div>
-      Connecting to live data…
+  <div class="totals" id="totals-box">
+    <h2>Programme totals — all villages</h2>
+    <div class="totals-grid" id="totals-grid">
+      <div class="loading">Loading…</div>
     </div>
   </div>
 
-  <!-- Village cards -->
-  <div class="village-grid" id="village-grid"></div>
-
-  <!-- Trend chart -->
-  <div class="chart-section">
-    <div class="chart-title">Screening activity — all villages (last 30 syncs)</div>
-    <div style="position:relative;height:200px">
-      <canvas id="trend-chart"
-        role="img"
-        aria-label="Line chart showing total screenings over time across all villages">
-        Trend data loading…
-      </canvas>
-    </div>
+  <div class="grid" id="village-grid">
+    <div class="loading">Fetching live data from Supabase…</div>
   </div>
 </main>
 
 <footer>
   MediAid · AICEXPERTS Limited · Douala, Cameroon ·
-  <a href="https://github.com/bmpafe1/MediAid" target="_blank" rel="noopener">Open Source on GitHub</a> ·
-  Anonymised aggregates only — no patient data ·
-  <a href="mailto:contact@mediaid.health">contact@mediaid.health</a>
+  <a href="https://github.com/bmpafe1/MediAid" style="color:#0d6e6e">Open Source on GitHub</a> ·
+  Data: anonymised geohash aggregates only — no patient identifiers ·
+  contact@mediaid.health
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-// ── CONFIG — replace these two values ──────────────────────────────────────
-const SUPABASE_URL  = 'https://ujdmwuesofujotszigey.supabase.co';   // e.g. https://abcxyz.supabase.co
-const ANON_KEY      = 'sb_publishable_q6-rovR2as_zNarIo84bqg_im1sPKhb';        // eyJ... from Settings → API
-// ───────────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ujdmwuesofujotszigey.supabase.co';   // e.g. https://abcxyz.supabase.co
+const ANON_KEY     = 'sb_publishable_q6-rovR2as_zNarIo84bqg_im1sPKhb';        // your public anon key
 
-let trendChart = null;
-
-async function fetchRows() {
+async function fetchData() {
   const url = `${SUPABASE_URL}/rest/v1/outbreak_radar` +
     `?select=village_name,total_scans,green_count,amber_count,red_count,` +
     `cough_positive,fever_flag,referral_count,alert_level,recorded_at` +
@@ -355,252 +103,94 @@ async function fetchRows() {
     headers: { 'apikey': ANON_KEY, 'Accept': 'application/json' }
   });
 
-  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 function latestPerVillage(rows) {
   const seen = {};
-  rows.forEach(r => { if (!seen[r.village_name]) seen[r.village_name] = r; });
+  for (const r of rows) {
+    if (!seen[r.village_name]) seen[r.village_name] = r;
+  }
   return Object.values(seen);
 }
 
-function pct(n, total) {
-  return total > 0 ? Math.round((n / total) * 100) : 0;
+function bar(label, count, total, cls) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return `<div class="bar-row">
+    <div class="bar-label"><span>${label}</span><span>${count} (${pct}%)</span></div>
+    <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+  </div>`;
 }
 
-function fmtDate(iso) {
-  return new Date(iso).toLocaleString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
-}
-
-function renderTotals(rows) {
-  const t = rows.reduce((a, r) => ({
-    scans:     a.scans     + (r.total_scans    || 0),
-    referrals: a.referrals + (r.referral_count || 0),
-    red:       a.red       + (r.red_count      || 0),
-    cough:     a.cough     + (r.cough_positive || 0),
-  }), { scans: 0, referrals: 0, red: 0, cough: 0 });
-
-  const villages = latestPerVillage(rows);
-
-  document.getElementById('totals-strip').innerHTML = `
-    <div class="total-card">
-      <div class="total-num">${t.scans}</div>
-      <div class="total-label">Total screenings</div>
-    </div>
-    <div class="total-card">
-      <div class="total-num">${t.referrals}</div>
-      <div class="total-label">Referrals issued</div>
-    </div>
-    <div class="total-card">
-      <div class="total-num red">${t.red}</div>
-      <div class="total-label">Emergency flags</div>
-    </div>
-    <div class="total-card">
-      <div class="total-num amber">${t.cough}</div>
-      <div class="total-label">Cough positives</div>
-    </div>
-    <div class="total-card">
-      <div class="total-num">${villages.length}</div>
-      <div class="total-label">Active villages</div>
-    </div>
-  `;
-}
-
-function renderVillageCard(r) {
+function renderVillage(r) {
   const t = r.total_scans || 0;
-  const gPct = pct(r.green_count || 0, t);
-  const aPct = pct(r.amber_count || 0, t);
-  const rPct = pct(r.red_count   || 0, t);
-
-  const regionMap = { 'Baligham': 'North West Region', 'Bagam': 'West Region' };
-  const region = regionMap[r.village_name] || 'Cameroon';
-
-  return `
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <div class="village-name">${r.village_name}</div>
-          <div class="village-sub">${region}</div>
-        </div>
-        <span class="alert-pill ${r.alert_level}">${r.alert_level}</span>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-num">${t}</div>
-          <div class="stat-label">Total scans</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num">${r.referral_count || 0}</div>
-          <div class="stat-label">Referrals</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num r">${r.red_count || 0}</div>
-          <div class="stat-label">Emergency flags</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num a">${r.cough_positive || 0}</div>
-          <div class="stat-label">Cough positive</div>
-        </div>
-      </div>
-
-      <div class="dist-label">
-        <span>Result distribution</span>
-        <span>${t} scans</span>
-      </div>
-      <div class="dist-bar">
-        <div class="seg-green" style="width:${gPct}%"></div>
-        <div class="seg-amber" style="width:${aPct}%"></div>
-        <div class="seg-red"   style="width:${rPct}%"></div>
-      </div>
-      <div class="dist-legend">
-        <div class="leg"><div class="leg-dot" style="background:#1d9e75"></div>Green ${gPct}%</div>
-        <div class="leg"><div class="leg-dot" style="background:#ef9f27"></div>Amber ${aPct}%</div>
-        <div class="leg"><div class="leg-dot" style="background:#e24b4a"></div>Red ${rPct}%</div>
-      </div>
-
-      <div class="sync-time">Last CHA sync: ${fmtDate(r.recorded_at)}</div>
+  const ts = new Date(r.recorded_at).toLocaleDateString('en-GB',
+    { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  return `<div class="card">
+    <div class="card-header">
+      <div class="village-name">${r.village_name}</div>
+      <span class="alert-badge ${r.alert_level}">${r.alert_level}</span>
     </div>
-  `;
+    <div class="stats">
+      <div class="stat"><div class="stat-num">${t}</div>
+        <div class="stat-label">Total scans</div></div>
+      <div class="stat"><div class="stat-num">${r.referral_count || 0}</div>
+        <div class="stat-label">Referrals issued</div></div>
+      <div class="stat"><div class="stat-num red">${r.red_count || 0}</div>
+        <div class="stat-label">Red flags</div></div>
+      <div class="stat"><div class="stat-num amber">${r.cough_positive || 0}</div>
+        <div class="stat-label">Cough positive</div></div>
+    </div>
+    ${bar('Green (no action)', r.green_count || 0, t, 'bar-green')}
+    ${bar('Amber (refer)', r.amber_count || 0, t, 'bar-amber')}
+    ${bar('Red (emergency)', r.red_count || 0, t, 'bar-red')}
+    <div style="font-size:0.7rem;color:#999;margin-top:0.75rem">Last sync: ${ts}</div>
+  </div>`;
 }
 
-function renderVillages(rows) {
-  const villages = latestPerVillage(rows);
-  document.getElementById('village-grid').innerHTML =
-    villages.length ? villages.map(renderVillageCard).join('') : '';
-}
-
-function renderTrendChart(rows) {
-  // Take up to last 30 rows, oldest first for the chart
-  const slice = rows.slice(0, 30).reverse();
-  const labels = slice.map(r =>
-    new Date(r.recorded_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })
-  );
-  const scans  = slice.map(r => r.total_scans    || 0);
-  const coughs = slice.map(r => r.cough_positive || 0);
-  const reds   = slice.map(r => r.red_count      || 0);
-
-  const ctx = document.getElementById('trend-chart');
-  if (!ctx) return;
-
-  if (trendChart) trendChart.destroy();
-
-  trendChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Total scans',
-          data: scans,
-          borderColor: '#1d9e75',
-          backgroundColor: 'rgba(29,158,117,0.08)',
-          borderWidth: 2,
-          pointRadius: 3,
-          tension: 0.3,
-          fill: true,
-          borderDash: [],
-        },
-        {
-          label: 'Cough positive',
-          data: coughs,
-          borderColor: '#ef9f27',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          pointRadius: 3,
-          tension: 0.3,
-          borderDash: [5, 3],
-        },
-        {
-          label: 'Emergency flags',
-          data: reds,
-          borderColor: '#e24b4a',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          pointRadius: 3,
-          tension: 0.3,
-          borderDash: [2, 3],
-        },
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { mode: 'index', intersect: false },
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(0,0,0,0.04)' },
-          ticks: { font: { size: 11 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 10 }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: 'rgba(0,0,0,0.04)' },
-          ticks: { font: { size: 11 }, stepSize: 1 }
-        }
-      }
-    }
-  });
-
-  // Custom legend
-  const legendHtml = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#5f5e5a;margin-top:8px">
-      <span style="display:flex;align-items:center;gap:4px">
-        <span style="width:20px;height:3px;background:#1d9e75;border-radius:2px;display:inline-block"></span>
-        Total scans
-      </span>
-      <span style="display:flex;align-items:center;gap:4px">
-        <span style="width:20px;height:2px;background:#ef9f27;border-radius:2px;display:inline-block;border-top:2px dashed #ef9f27"></span>
-        Cough positive
-      </span>
-      <span style="display:flex;align-items:center;gap:4px">
-        <span style="width:20px;height:2px;background:#e24b4a;border-radius:2px;display:inline-block;border-top:2px dashed #e24b4a"></span>
-        Emergency flags
-      </span>
-    </div>`;
-
-  const chartSection = ctx.closest('.chart-section');
-  if (chartSection && !chartSection.querySelector('.chart-legend')) {
-    const div = document.createElement('div');
-    div.className = 'chart-legend';
-    div.innerHTML = legendHtml;
-    chartSection.appendChild(div);
-  }
-}
-
-async function refresh() {
+async function render() {
   try {
-    const rows = await fetchRows();
+    const rows = await fetchData();
+    const villages = latestPerVillage(rows);
 
-    renderTotals(rows);
-    renderVillages(rows);
-    renderTrendChart(rows);
+    // Totals
+    const totals = rows.reduce((a, r) => ({
+      scans:     a.scans     + (r.total_scans    || 0),
+      referrals: a.referrals + (r.referral_count || 0),
+      red:       a.red       + (r.red_count      || 0),
+      cough:     a.cough     + (r.cough_positive || 0),
+    }), { scans: 0, referrals: 0, red: 0, cough: 0 });
 
-    const latest = rows[0]?.recorded_at ? fmtDate(rows[0].recorded_at) : 'no data yet';
+    document.getElementById('totals-grid').innerHTML = `
+      <div class="total-stat"><div class="total-num">${totals.scans}</div>
+        <div class="total-label">Total screenings</div></div>
+      <div class="total-stat"><div class="total-num">${totals.referrals}</div>
+        <div class="total-label">Referrals issued</div></div>
+      <div class="total-stat"><div class="total-num" style="color:#a32d2d">${totals.red}</div>
+        <div class="total-label">Emergency flags</div></div>
+      <div class="total-stat"><div class="total-num" style="color:#ba7517">${totals.cough}</div>
+        <div class="total-label">Cough positives</div></div>
+      <div class="total-stat"><div class="total-num">${villages.length}</div>
+        <div class="total-label">Active villages</div></div>
+    `;
+
+    document.getElementById('village-grid').innerHTML =
+      villages.map(renderVillage).join('');
+
+    const latest = rows[0]?.recorded_at
+      ? new Date(rows[0].recorded_at).toLocaleString('en-GB')
+      : 'unknown';
     document.getElementById('last-updated').textContent = latest;
 
-  } catch (err) {
-    const grid = document.getElementById('village-grid');
-    if (grid && !grid.children.length) {
-      grid.innerHTML = `<div class="error-box">
-        Could not load live data: ${err.message}<br>
-        <small>Check SUPABASE_URL and ANON_KEY in this file, then reload.</small>
-      </div>`;
-    }
-    console.error('MediAid dashboard error:', err);
+  } catch (e) {
+    document.getElementById('village-grid').innerHTML =
+      `<div class="error">Could not load data: ${e.message}</div>`;
   }
 }
 
-// Initial load + auto-refresh every 30 seconds
-refresh();
-setInterval(refresh, 30000);
+render();
+setInterval(render, 30000); // auto-refresh every 30 seconds
 </script>
-
 </body>
 </html>
