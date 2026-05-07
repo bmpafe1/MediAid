@@ -1,7 +1,6 @@
-// Native (iOS/Android) outbreak map — uses react-native-maps
+// Native (iOS/Android) outbreak map — uses react-native-maps if available
 import { MaterialIcons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, Callout } from 'react-native-maps';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '@/constants/theme';
 
@@ -34,17 +33,68 @@ interface Props {
 }
 
 export default function OutbreakMap({ alerts, selectedVillage, onSelectVillage, climateLayer }: Props) {
-  const mapRef = useRef<MapView>(null);
+  const [mapPackage, setMapPackage] = useState<any>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
-    if (selectedVillage && VILLAGE_COORDS[selectedVillage]) {
-      mapRef.current?.animateToRegion({
-        ...VILLAGE_COORDS[selectedVillage],
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      }, 600);
+    try {
+      const pkg = require('react-native-maps');
+      setMapPackage(pkg);
+    } catch (error) {
+      setMapError('Native map module unavailable');
     }
-  }, [selectedVillage]);
+  }, []);
+
+  useEffect(() => {
+    if (!mapPackage || !selectedVillage) return;
+    const coord = VILLAGE_COORDS[selectedVillage];
+    if (!coord) return;
+    mapRef.current?.animateToRegion({
+      ...coord,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    }, 600);
+  }, [selectedVillage, mapPackage]);
+
+  const MapView = mapPackage?.default ?? mapPackage;
+  const Marker = mapPackage?.Marker;
+  const Circle = mapPackage?.Circle;
+  const Callout = mapPackage?.Callout;
+
+  if (!MapView || !Marker || !Circle || !Callout) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.mapBg}>
+          <Text style={styles.mapBgLabel}>NW CAMEROON</Text>
+          <Text style={styles.mapBgSub}>Bamenda · Northwest Region</Text>
+        </View>
+        <View style={styles.unavailableOverlay}>
+          <MaterialIcons name="map" size={24} color="#FFF" />
+          <Text style={styles.unavailableText}>Radar map unavailable</Text>
+          <Text style={styles.unavailableHint}>This build does not include the native map module. Install the full Android app or enable react-native-maps.</Text>
+        </View>
+        {climateLayer && (
+          <View style={styles.climateBadge}>
+            <MaterialIcons name="water-drop" size={11} color="#4488FF" />
+            <Text style={styles.climateBadgeText}>Rainfall overlay active</Text>
+          </View>
+        )}
+        <View style={styles.legend}>
+          {[
+            { color: theme.statusRed, label: 'Outbreak' },
+            { color: theme.statusYellow, label: 'Watch' },
+            { color: theme.statusGreen, label: 'Normal' },
+          ].map((l) => (
+            <View key={l.label} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: l.color }]} />
+              <Text style={styles.legendText}>{l.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -185,6 +235,24 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 10, color: theme.textSecondary, fontWeight: '600' },
+  mapBg: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#081522',
+  },
+  mapBgLabel: {
+    fontSize: 18, fontWeight: '800', color: '#1E3A4A', letterSpacing: 3,
+  },
+  mapBgSub: { fontSize: 11, color: '#1A2E3A', fontWeight: '600', letterSpacing: 1 },
+  unavailableOverlay: {
+    position: 'absolute', top: '44%', left: 16, right: 16,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: theme.radius.medium,
+    padding: 16,
+  },
+  unavailableText: { fontSize: 14, fontWeight: '800', color: '#FFF', textAlign: 'center' },
+  unavailableHint: { fontSize: 11, color: '#EEE', textAlign: 'center', lineHeight: 16 },
   climateBadge: {
     position: 'absolute', top: 8, left: 8,
     flexDirection: 'row', alignItems: 'center', gap: 4,
