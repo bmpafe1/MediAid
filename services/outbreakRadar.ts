@@ -5,40 +5,40 @@
  * Public entry point for logging scan events to the outbreak radar.
  *
  * Call logPrototypeSession() immediately after a scan completes.
- * It builds an anonymised RadarEvent via toRadarEvent() (the de-identification
- * gateway) and enqueues it for background upload via radarQueue.
+ * It builds a RadarEvent via toRadarEvent() (the de-identification gateway)
+ * and enqueues it for background upload via radarQueue.
  *
  * Nothing here transmits data directly — all transmission happens in
- * radarQueue.flush() which is triggered by connectivity events, scan
- * completions, and the "Sync now" button.
+ * radarQueue.flush() which is triggered by connectivity events and the
+ * "Sync now" button.
  *
- * Data transmitted per event (whitelisted in deidentify.ts):
+ * ─── Transmitted per event (whitelist enforced by toRadarEvent()) ──────────────
  *   village_geohash, data_source, total_scans, green_count, amber_count,
- *   red_count, cough_positive, referral_count, fever_flag.
+ *   red_count, cough_positive, referral_count, fever_flag,
+ *   client_event_id, recorded_at.
  *
- * NEVER transmitted: patient name, patient ID, GPS, raw audio/video,
- * biometric templates, village_name, free text, GBV indicators.
+ * ─── NEVER transmitted ────────────────────────────────────────────────────────
+ *   patient name, patient ID, GPS, raw audio/video, biometric templates,
+ *   village_name, free text, GBV indicators, DOB, phone, email.
  */
 
 import { enqueue, flush } from './radarQueue';
-import { toRadarEvent, DataSource } from './deidentify';
+import { toRadarEvent } from './deidentify';
+import type { DataSource } from './deidentify';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 export type SessionType = 'co-design' | 'demo' | 'training' | 'field-test';
 
 export interface LogSessionParams {
-  /** 4-char geohash of the village/site where the scan was performed. */
+  /** Pre-configured 4-char geohash of the village/site. Never raw GPS. */
   villageGeohash: string;
 
   /**
-   * The session trust tier.
-   * co-design / demo → 'simulated_demo'
-   * training         → 'training'
-   * field-test       → 'field_test'
-   * ('field' is never sent from the app in the current build)
+   * Session trust tier:
+   *   co-design / demo → 'simulated_demo'
+   *   training         → 'training'
+   *   field-test       → 'field_test'
    */
   sessionType: SessionType;
 
@@ -48,38 +48,34 @@ export interface LogSessionParams {
   /** True if the cough segment produced a positive signal flag. */
   coughPositive: boolean;
 
-  /** True if a referral was issued for this patient. */
+  /** True if a referral was issued. */
   referralIssued?: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// sessionType → DataSource mapping
-// ---------------------------------------------------------------------------
+// ── sessionType → DataSource ───────────────────────────────────────────────────
 
 function resolveDataSource(sessionType: SessionType): DataSource {
   switch (sessionType) {
-    case 'training':    return 'training';
-    case 'field-test':  return 'field_test';
+    case 'training':   return 'training';
+    case 'field-test': return 'field_test';
     case 'co-design':
     case 'demo':
-    default:            return 'simulated_demo';
+    default:           return 'simulated_demo';
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+// ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
  * Log a completed scan session to the outbreak radar queue.
  *
- * This function:
- *   1. Calls toRadarEvent() to build the whitelisted anonymised event.
- *   2. Enqueues it locally (AsyncStorage, never dropped until server confirms).
- *   3. Attempts an immediate flush (non-blocking, never throws).
+ * Steps:
+ *   1. toRadarEvent() builds the whitelisted anonymised RadarEvent.
+ *   2. enqueue() stores it in AsyncStorage (never dropped until server confirms).
+ *   3. flush() is fired-and-forgotten — never delays the UI.
  *
- * Safe to call from the scan workflow with no await — it runs in the
- * background and never delays the UI.
+ * Safe to call without await from the scan workflow.
+ * Never throws.
  */
 export async function logPrototypeSession(params: LogSessionParams): Promise<void> {
   try {
@@ -93,12 +89,9 @@ export async function logPrototypeSession(params: LogSessionParams): Promise<voi
 
     await enqueue(event);
 
-    // Fire-and-forget flush — does not block the caller
-    flush().catch(() => {
-      // flush() itself never throws, but we catch anyway for safety
-    });
+    flush().catch(() => { /* flush() itself never throws */ });
   } catch (err) {
-    // Never propagate errors to the scan workflow
+    // Never propagate to the scan workflow
     console.error('[outbreakRadar] logPrototypeSession error:', err);
   }
 }
