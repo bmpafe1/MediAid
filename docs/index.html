@@ -1,196 +1,821 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MediAid — Outbreak Radar | Live Community Health Intelligence</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: #f8fafb; color: #1a1a1a; }
-  header { background: #0d6e6e; color: white; padding: 1.5rem 2rem; }
-  header h1 { font-size: 1.4rem; font-weight: 600; }
-  header p { font-size: 0.85rem; opacity: 0.85; margin-top: 0.25rem; }
-  .badge { display: inline-block; background: rgba(255,255,255,0.2);
-           border-radius: 999px; padding: 2px 10px; font-size: 0.75rem;
-           margin-top: 0.5rem; }
-  main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-  .meta { font-size: 0.8rem; color: #666; margin-bottom: 1.5rem; }
-  #last-updated { font-weight: 500; color: #0d6e6e; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-          gap: 1rem; margin-bottom: 2rem; }
-  .card { background: white; border-radius: 12px; border: 1px solid #e5e7eb;
-          padding: 1.25rem; }
-  .card-header { display: flex; justify-content: space-between; align-items: flex-start;
-                 margin-bottom: 1rem; }
-  .village-name { font-size: 1rem; font-weight: 600; }
-  .alert-badge { font-size: 0.7rem; font-weight: 600; border-radius: 999px;
-                 padding: 3px 10px; }
-  .NORMAL   { background: #e1f5ee; color: #085041; }
-  .ELEVATED { background: #faeeda; color: #633806; }
-  .OUTBREAK { background: #fcebeb; color: #791f1f; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat { background: #f8fafb; border-radius: 8px; padding: 0.6rem 0.75rem; }
-  .stat-num { font-size: 1.4rem; font-weight: 600; }
-  .stat-label { font-size: 0.7rem; color: #666; margin-top: 2px; }
-  .green { color: #0d6e6e; } .amber { color: #ba7517; } .red { color: #a32d2d; }
-  .bar-row { margin-top: 1rem; }
-  .bar-label { font-size: 0.72rem; color: #666; display: flex;
-               justify-content: space-between; margin-bottom: 3px; }
-  .bar-track { background: #f0f0f0; border-radius: 999px; height: 6px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 999px; transition: width 0.8s ease; }
-  .bar-green { background: #1d9e75; } .bar-amber { background: #ef9f27; }
-  .bar-red { background: #e24b4a; }
-  .totals { background: white; border-radius: 12px; border: 1px solid #e5e7eb;
-            padding: 1.25rem; margin-bottom: 2rem; }
-  .totals h2 { font-size: 0.85rem; font-weight: 600; color: #666;
-               text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
-  .totals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                 gap: 1rem; }
-  .total-stat { text-align: center; }
-  .total-num { font-size: 2rem; font-weight: 600; color: #0d6e6e; }
-  .total-label { font-size: 0.75rem; color: #666; margin-top: 4px; }
-  footer { text-align: center; font-size: 0.75rem; color: #999;
-           padding: 2rem 1rem; border-top: 1px solid #e5e7eb; margin-top: 2rem; }
-  .loading { text-align: center; padding: 3rem; color: #666; }
-  .error { background: #fcebeb; color: #791f1f; border-radius: 8px;
-           padding: 1rem; margin: 1rem 0; font-size: 0.85rem; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediAid Outbreak Radar — Public Dashboard</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Reset & base                                                         */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0a1520;
+      --surface:     #111f2e;
+      --surface2:    #162535;
+      --border:      #1e3245;
+      --primary:     #00b4d8;
+      --text:        #e8f0f6;
+      --text-muted:  #7a9ab0;
+      --text-sub:    #9ab5c8;
+      --green:       #00d97e;
+      --amber:       #ffb800;
+      --red:         #ff3b3b;
+      --grey:        #a0a0a0;
+      --green-bg:    #00d97e18;
+      --amber-bg:    #ffb80018;
+      --red-bg:      #ff3b3b18;
+      --radius-sm:   6px;
+      --radius-md:   12px;
+      --radius-lg:   16px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Layout                                                              */
+    /* ------------------------------------------------------------------ */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Header                                                              */
+    /* ------------------------------------------------------------------ */
+    .site-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 24px 0 20px;
+      margin-bottom: 24px;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-circle {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), #0077a8);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: clamp(18px, 4vw, 24px);
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .header-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Chips / badges                                                      */
+    /* ------------------------------------------------------------------ */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+
+    .chip-green  { color: var(--green);  background: var(--green-bg);  border-color: #00d97e44; }
+    .chip-amber  { color: var(--amber);  background: var(--amber-bg);  border-color: #ffb80044; }
+    .chip-red    { color: var(--red);    background: var(--red-bg);    border-color: #ff3b3b44; }
+    .chip-grey   { color: var(--grey);   background: #a0a0a018;         border-color: #a0a0a044; }
+    .chip-blue   { color: var(--primary); background: #00b4d818;        border-color: #00b4d844; }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    /* ------------------------------------------------------------------ */
+    /* Prototype banner                                                    */
+    /* ------------------------------------------------------------------ */
+    #prototype-banner {
+      display: none; /* shown by JS when any row has data_source != 'field' */
+      background: #ffb80012;
+      border: 1px solid #ffb80055;
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--amber);
+      line-height: 1.6;
+    }
+
+    #prototype-banner strong { font-weight: 700; }
+
+    /* ------------------------------------------------------------------ */
+    /* Status panel (loading / error / empty)                             */
+    /* ------------------------------------------------------------------ */
+    .status-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .status-icon { font-size: 44px; }
+    .status-title { font-size: 18px; font-weight: 700; color: var(--text); }
+    .status-sub { font-size: 13px; color: var(--text-muted); line-height: 1.6; max-width: 400px; }
+    .status-code { font-family: monospace; font-size: 12px; color: var(--red); }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px; border-radius: var(--radius-md);
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      border: none; text-decoration: none;
+    }
+
+    .btn-primary { background: var(--primary); color: #001820; }
+    .btn-primary:hover { opacity: 0.88; }
+
+    /* spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Programme totals                                                    */
+    /* ------------------------------------------------------------------ */
+    .totals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .total-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      text-align: center;
+    }
+
+    .total-value {
+      font-size: 28px; font-weight: 700; color: var(--primary);
+    }
+
+    .total-label {
+      font-size: 10px; color: var(--text-muted); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Village cards                                                       */
+    /* ------------------------------------------------------------------ */
+    #cards-section { margin-bottom: 28px; }
+
+    .section-title {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .village-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 10px;
+      border-left: 4px solid transparent;
+    }
+
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap; margin-bottom: 10px;
+    }
+
+    .card-village { font-size: 17px; font-weight: 700; flex: 1; min-width: 120px; }
+    .card-geo { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    .card-stats {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+
+    .stat-pill {
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      text-align: center;
+      min-width: 70px;
+    }
+
+    .stat-pill .val { font-size: 18px; font-weight: 700; color: var(--text); }
+    .stat-pill .lbl { font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+    /* Outcome bars */
+    .bars-row {
+      display: flex; gap: 4px; margin-bottom: 8px; align-items: center;
+    }
+
+    .bar-seg {
+      height: 8px; border-radius: 4px; min-width: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .bars-legend {
+      display: flex; gap: 12px; flex-wrap: wrap; font-size: 10px; color: var(--text-muted);
+    }
+
+    .bars-legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ------------------------------------------------------------------ */
+    /* Alert methodology panel                                             */
+    /* ------------------------------------------------------------------ */
+    .method-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+
+    .method-card h3 {
+      font-size: 13px; font-weight: 700; color: var(--text);
+      margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .method-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: 10px; font-size: 13px;
+    }
+
+    .method-badge {
+      border-radius: 999px; padding: 2px 10px;
+      font-size: 10px; font-weight: 800;
+      border: 1px solid; white-space: nowrap; flex-shrink: 0; margin-top: 1px;
+    }
+
+    .method-desc { color: var(--text-sub); line-height: 1.5; }
+
+    .method-note {
+      font-size: 11px; color: var(--text-muted);
+      border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Footer                                                              */
+    /* ------------------------------------------------------------------ */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      padding: 20px 0 28px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 2;
+      text-align: center;
+    }
+
+    .site-footer a { color: var(--primary); text-decoration: none; }
+    .site-footer a:hover { text-decoration: underline; }
+
+    /* ------------------------------------------------------------------ */
+    /* Responsive                                                          */
+    /* ------------------------------------------------------------------ */
+    @media (max-width: 600px) {
+      .header-meta { align-items: flex-start; }
+      .total-value { font-size: 22px; }
+      .stat-pill .val { font-size: 15px; }
+    }
+  </style>
 </head>
 <body>
 
-<header>
-  <h1>MediAid — Outbreak Radar</h1>
-  <p>Live community health intelligence · Baligham &amp; Bagam · North West &amp; West Regions, Cameroon</p>
-  <span class="badge">Open Data · Anonymised Aggregates · No patient data</span>
+<!-- ======================================================================
+     CONFIGURATION — edit only this block
+     Publishable / anon key: safe to commit; has INSERT + view-SELECT only.
+     NEVER add the service-role / secret key here or anywhere in /docs.
+     ====================================================================== -->
+<script>
+  const CONFIG = {
+    // Replace with your Supabase project URL and anon key.
+    // Both are public values: the RLS policies on the server enforce security.
+    SUPABASE_URL:  'https://YOUR_PROJECT.supabase.co',
+    SUPABASE_ANON: 'YOUR_ANON_KEY',
+
+    // View endpoint
+    VIEW: 'outbreak_radar_7d',
+
+    // Auto-refresh interval (ms)
+    REFRESH_MS: 30_000,
+  };
+</script>
+<!-- ====================================================================== -->
+
+<header class="site-header">
+  <div class="container">
+    <div class="header-inner">
+      <div class="header-logo">
+        <div class="logo-circle">🏥</div>
+        <div>
+          <div class="header-title">MediAid Outbreak Radar</div>
+          <div class="header-sub">Public Dashboard · Northwest Cameroon · 7-day rolling window</div>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span class="chip chip-blue" id="live-chip">
+          <span class="dot"></span>
+          Loading…
+        </span>
+        <span id="last-refresh" style="font-size:11px;color:var(--text-muted);">—</span>
+      </div>
+    </div>
+  </div>
 </header>
 
-<main>
-  <p class="meta">
-    Data updates when Community Health Aides sync after each screening session.
-    Last updated: <span id="last-updated">loading…</span>
-  </p>
+<main class="container">
 
-  <div class="totals" id="totals-box">
-    <h2>Programme totals — all villages</h2>
-    <div class="totals-grid" id="totals-grid">
-      <div class="loading">Loading…</div>
+  <!-- Prototype banner — shown by JS when data_source != 'field' rows exist -->
+  <div id="prototype-banner">
+    ⚠️ <strong>PROTOTYPE DATA:</strong> The figures on this dashboard come from
+    <strong>simulated scan results and test sessions</strong>, not from real patients.
+    No clinical decisions should be based on these numbers.
+    Rows are tagged with their <code>data_source</code> value so you can distinguish
+    prototype from genuine field data.
+  </div>
+
+  <!-- Loading state -->
+  <div id="state-loading" class="status-panel">
+    <div class="spinner"></div>
+    <div class="status-title">Loading radar data…</div>
+    <div class="status-sub">Fetching the last 7 days of aggregated scan events from Supabase.</div>
+  </div>
+
+  <!-- Error state -->
+  <div id="state-error" class="status-panel" style="display:none;">
+    <div class="status-icon">⛔</div>
+    <div class="status-title">Could not load radar data</div>
+    <div class="status-sub" id="error-message">Unknown error</div>
+    <div class="status-code" id="error-code"></div>
+    <button class="btn btn-primary" onclick="loadData()">↻ Retry</button>
+  </div>
+
+  <!-- Empty state -->
+  <div id="state-empty" class="status-panel" style="display:none;">
+    <div class="status-icon">📡</div>
+    <div class="status-title">No sessions in the last 7 days</div>
+    <div class="status-sub">
+      Complete scans on a CHA device and sync them — they will appear here within 30 seconds.
     </div>
   </div>
 
-  <div class="grid" id="village-grid">
-    <div class="loading">Fetching live data from Supabase…</div>
+  <!-- Data content -->
+  <div id="state-data" style="display:none;">
+
+    <!-- Programme totals -->
+    <p class="section-title">PROGRAMME TOTALS — LAST 7 DAYS</p>
+    <div class="totals-grid">
+      <div class="total-card">
+        <div class="total-value" id="tot-scans">—</div>
+        <div class="total-label">Total Scans</div>
+      </div>
+      <div class="total-card">
+        <div class="total-value" style="color:var(--green)" id="tot-green">—</div>
+        <div class="total-label">GREEN</div>
+      </div>
+      <div class="total-card">
+        <div class="total-value" style="color:var(--amber)" id="tot-amber">—</div>
+        <div class="total-label">AMBER</div>
+      </div>
+      <div class="total-card">
+        <div class="total-value" style="color:var(--red)" id="tot-red">—</div>
+        <div class="total-label">RED</div>
+      </div>
+      <div class="total-card">
+        <div class="total-value" style="color:var(--primary)" id="tot-cough">—</div>
+        <div class="total-label">Cough+</div>
+      </div>
+      <div class="total-card">
+        <div class="total-value" style="color:var(--primary)" id="tot-referral">—</div>
+        <div class="total-label">Referrals</div>
+      </div>
+    </div>
+
+    <!-- Village cards -->
+    <div id="cards-section">
+      <p class="section-title" id="cards-label">VILLAGE / SITE BREAKDOWN</p>
+      <div id="cards-container"></div>
+    </div>
+
+    <!-- Alert methodology -->
+    <div class="method-card">
+      <h3>How the alert level is computed</h3>
+
+      <div class="method-row">
+        <span class="method-badge chip-red">OUTBREAK</span>
+        <span class="method-desc">
+          <strong>≥ 2 RED-alert scans in the 7-day window</strong> from the same
+          geohash cell. Indicates repeated high-acuity cases requiring immediate
+          supervisor escalation.
+        </span>
+      </div>
+
+      <div class="method-row">
+        <span class="method-badge chip-amber">ELEVATED</span>
+        <span class="method-desc">
+          <strong>Cough-positive rate &gt; 35 % of total scans</strong> (with fewer than
+          2 red alerts). Elevated respiratory signal — watch for TB or viral surge.
+        </span>
+      </div>
+
+      <div class="method-row">
+        <span class="method-badge chip-green">NORMAL</span>
+        <span class="method-desc">
+          No outbreak threshold exceeded in the rolling 7-day window.
+        </span>
+      </div>
+
+      <div class="method-note">
+        <strong>Window:</strong> Rows from the last 7 days (per <code>recorded_at</code>),
+        grouped by <code>village_geohash</code> and <code>data_source</code>.<br>
+        <strong>Small-cell suppression:</strong> Real field data (<code>data_source = 'field'</code>)
+        with fewer than 5 individual scans is not published — cells under this threshold
+        are hidden to prevent reverse-identification of individuals in small villages.<br>
+        <strong>Rainfall / climate anomaly trigger:</strong> Planned — not yet active.
+        DHIS2 Climate App / ERA-5 / CHIRPS integration is scheduled for Quarter 2.
+        All current alert levels are derived solely from scan outcome counts.<br>
+        <strong>Alert level source:</strong> Computed server-side in the
+        <code>outbreak_radar_7d</code> Supabase view; clients cannot supply or override it.
+      </div>
+    </div>
+
+  </div><!-- /#state-data -->
+
+  <!-- Always-visible methodology note -->
+  <div class="method-card" style="margin-bottom:20px;">
+    <h3>Data sources &amp; privacy</h3>
+    <p style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+      Each row in this dashboard represents <strong>one anonymised scan event</strong>
+      from a Community Health Aide (CHA) device. Only aggregate counts and a
+      4-character geohash (~39 km² cell) are transmitted — no patient names,
+      identifiers, GPS coordinates, audio recordings, images, or biometric data
+      ever leave the device.<br><br>
+      <strong>Data sources:</strong>
+      <code style="color:var(--amber)">simulated_demo</code> — prototype UI testing ·
+      <code style="color:var(--amber)">training</code> — CHA onboarding exercises ·
+      <code style="color:var(--amber)">field_test</code> — pre-deployment validation ·
+      <code style="color:var(--green)">field</code> — live clinical data (subject to
+      small-cell suppression).<br><br>
+      <strong>Supabase RLS:</strong> The public anon key may only INSERT into the base
+      table and SELECT from this view. Direct SELECT on the base table is forbidden for
+      the anon role.
+    </p>
   </div>
+
 </main>
 
-<footer>
-  MediAid · AICEXPERTS Limited · Douala, Cameroon ·
-  <a href="https://github.com/bmpafe1/MediAid" style="color:#0d6e6e">Open Source on GitHub</a> ·
-  Data: anonymised geohash aggregates only — no patient identifiers ·
-  contact@mediaid.health
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      <a href="https://github.com/bmpafe1/MediAid" target="_blank" rel="noopener">GitHub Repository</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/bmpafe1/MediAid/blob/main/LICENSE" target="_blank" rel="noopener">MIT Licence</a>
+      &nbsp;·&nbsp;
+      <a href="api-schema.md" target="_blank">API Schema</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/bmpafe1/MediAid/blob/main/supabase/README.md" target="_blank" rel="noopener">Supabase README</a>
+    </p>
+    <p style="margin-top:6px;">
+      MediAid v1.0-prototype · UNICEF Venture Fund 2026 · AICEXPERTS Limited · NW Cameroon
+    </p>
+    <p style="margin-top:4px;font-size:11px;">
+      This is a screening &amp; triage aid, not a diagnostic device.
+      Simulated outputs are clearly labelled.
+    </p>
+  </div>
 </footer>
 
+<!-- ====================================================================== -->
+<!-- Application logic                                                        -->
+<!-- ====================================================================== -->
 <script>
-const SUPABASE_URL = 'https://ujdmwuesofujotszigey.supabase.co';   // e.g. https://abcxyz.supabase.co
-const ANON_KEY     = 'sb_publishable_q6-rovR2as_zNarIo84bqg_im1sPKhb';        // your public anon key
+  'use strict';
 
-async function fetchData() {
-  const url = `${SUPABASE_URL}/rest/v1/outbreak_radar` +
-    `?select=village_name,total_scans,green_count,amber_count,red_count,` +
-    `cough_positive,fever_flag,referral_count,alert_level,recorded_at` +
-    `&order=recorded_at.desc&limit=200`;
+  /* ── Helpers ────────────────────────────────────────────────────────── */
 
-  const res = await fetch(url, {
-    headers: { 'apikey': ANON_KEY, 'Accept': 'application/json' }
-  });
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-function latestPerVillage(rows) {
-  const seen = {};
-  for (const r of rows) {
-    if (!seen[r.village_name]) seen[r.village_name] = r;
+  /** Escape a value for safe insertion as text content. */
+  function esc(value) {
+    if (value === null || value === undefined) return '—';
+    const el = document.createElement('span');
+    el.textContent = String(value);
+    return el.innerHTML; // browser-escaped HTML entities
   }
-  return Object.values(seen);
-}
 
-function bar(label, count, total, cls) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  return `<div class="bar-row">
-    <div class="bar-label"><span>${label}</span><span>${count} (${pct}%)</span></div>
-    <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
-  </div>`;
-}
-
-function renderVillage(r) {
-  const t = r.total_scans || 0;
-  const ts = new Date(r.recorded_at).toLocaleDateString('en-GB',
-    { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-  return `<div class="card">
-    <div class="card-header">
-      <div class="village-name">${r.village_name}</div>
-      <span class="alert-badge ${r.alert_level}">${r.alert_level}</span>
-    </div>
-    <div class="stats">
-      <div class="stat"><div class="stat-num">${t}</div>
-        <div class="stat-label">Total scans</div></div>
-      <div class="stat"><div class="stat-num">${r.referral_count || 0}</div>
-        <div class="stat-label">Referrals issued</div></div>
-      <div class="stat"><div class="stat-num red">${r.red_count || 0}</div>
-        <div class="stat-label">Red flags</div></div>
-      <div class="stat"><div class="stat-num amber">${r.cough_positive || 0}</div>
-        <div class="stat-label">Cough positive</div></div>
-    </div>
-    ${bar('Green (no action)', r.green_count || 0, t, 'bar-green')}
-    ${bar('Amber (refer)', r.amber_count || 0, t, 'bar-amber')}
-    ${bar('Red (emergency)', r.red_count || 0, t, 'bar-red')}
-    <div style="font-size:0.7rem;color:#999;margin-top:0.75rem">Last sync: ${ts}</div>
-  </div>`;
-}
-
-async function render() {
-  try {
-    const rows = await fetchData();
-    const villages = latestPerVillage(rows);
-
-    // Totals
-    const totals = rows.reduce((a, r) => ({
-      scans:     a.scans     + (r.total_scans    || 0),
-      referrals: a.referrals + (r.referral_count || 0),
-      red:       a.red       + (r.red_count      || 0),
-      cough:     a.cough     + (r.cough_positive || 0),
-    }), { scans: 0, referrals: 0, red: 0, cough: 0 });
-
-    document.getElementById('totals-grid').innerHTML = `
-      <div class="total-stat"><div class="total-num">${totals.scans}</div>
-        <div class="total-label">Total screenings</div></div>
-      <div class="total-stat"><div class="total-num">${totals.referrals}</div>
-        <div class="total-label">Referrals issued</div></div>
-      <div class="total-stat"><div class="total-num" style="color:#a32d2d">${totals.red}</div>
-        <div class="total-label">Emergency flags</div></div>
-      <div class="total-stat"><div class="total-num" style="color:#ba7517">${totals.cough}</div>
-        <div class="total-label">Cough positives</div></div>
-      <div class="total-stat"><div class="total-num">${villages.length}</div>
-        <div class="total-label">Active villages</div></div>
-    `;
-
-    document.getElementById('village-grid').innerHTML =
-      villages.map(renderVillage).join('');
-
-    const latest = rows[0]?.recorded_at
-      ? new Date(rows[0].recorded_at).toLocaleString('en-GB')
-      : 'unknown';
-    document.getElementById('last-updated').textContent = latest;
-
-  } catch (e) {
-    document.getElementById('village-grid').innerHTML =
-      `<div class="error">Could not load data: ${e.message}</div>`;
+  /** Set text content safely. */
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value === null || value === undefined ? '—' : String(value);
   }
-}
 
-render();
-setInterval(render, 30000); // auto-refresh every 30 seconds
+  /** Show one state panel, hide others. */
+  function showState(name) {
+    ['loading', 'error', 'empty', 'data'].forEach((s) => {
+      const el = document.getElementById('state-' + s);
+      if (el) el.style.display = s === name ? '' : 'none';
+    });
+  }
+
+  /** Alert level → colour variable name. */
+  function alertColor(level) {
+    if (level === 'OUTBREAK') return 'var(--red)';
+    if (level === 'ELEVATED') return 'var(--amber)';
+    return 'var(--green)';
+  }
+
+  function alertBg(level) {
+    if (level === 'OUTBREAK') return 'var(--red-bg)';
+    if (level === 'ELEVATED') return 'var(--amber-bg)';
+    return 'var(--green-bg)';
+  }
+
+  function alertBorderColor(level) {
+    if (level === 'OUTBREAK') return '#ff3b3b';
+    if (level === 'ELEVATED') return '#ffb800';
+    return '#00d97e';
+  }
+
+  function alertChipClass(level) {
+    if (level === 'OUTBREAK') return 'chip-red';
+    if (level === 'ELEVATED') return 'chip-amber';
+    return 'chip-green';
+  }
+
+  /** Map geohash to a friendly display name (add yours here). */
+  const GEOHASH_NAMES = {
+    s0yg: 'Baligham',
+    s0yf: 'Bagam',
+    s000: 'Lab / Demo',
+  };
+
+  function villageName(geohash) {
+    return GEOHASH_NAMES[geohash] || ('Area ' + geohash);
+  }
+
+  /* ── Fetch ────────────────────────────────────────────────────────────── */
+
+  async function loadData() {
+    showState('loading');
+
+    const url =
+      CONFIG.SUPABASE_URL.replace(/\/$/, '') +
+      '/rest/v1/' + CONFIG.VIEW +
+      '?select=*&order=last_recorded_at.desc';
+
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          'apikey': CONFIG.SUPABASE_ANON,
+          'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON,
+          'Accept': 'application/json',
+        },
+      });
+    } catch (networkErr) {
+      showError('Network error — check your connection.', String(networkErr));
+      return;
+    }
+
+    if (!response.ok) {
+      let body = '';
+      try { body = await response.text(); } catch {}
+      showError(
+        'Server returned HTTP ' + response.status + ' ' + response.statusText +
+          (body ? '. Response: ' + body.slice(0, 200) : ''),
+        'HTTP ' + response.status
+      );
+      return;
+    }
+
+    let rows;
+    try {
+      rows = await response.json();
+    } catch (parseErr) {
+      showError('Could not parse server response as JSON.', String(parseErr));
+      return;
+    }
+
+    if (!Array.isArray(rows)) {
+      showError('Unexpected response shape (expected JSON array).', JSON.stringify(rows).slice(0, 120));
+      return;
+    }
+
+    renderDashboard(rows);
+    updateRefreshTime();
+  }
+
+  /* ── Error state ────────────────────────────────────────────────────── */
+
+  function showError(message, code) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-code').textContent = code || '';
+    showState('error');
+    updateRefreshTime();
+  }
+
+  /* ── Render ─────────────────────────────────────────────────────────── */
+
+  function renderDashboard(rows) {
+    if (rows.length === 0) {
+      showState('empty');
+      return;
+    }
+
+    // ── Prototype banner ──────────────────────────────────────────────
+    const hasNonField = rows.some((r) => r.data_source !== 'field');
+    document.getElementById('prototype-banner').style.display =
+      hasNonField ? 'block' : 'none';
+
+    // ── Programme totals ──────────────────────────────────────────────
+    let totScans = 0, totGreen = 0, totAmber = 0, totRed = 0,
+        totCough = 0, totReferral = 0;
+
+    rows.forEach((r) => {
+      totScans    += Number(r.total_scans)    || 0;
+      totGreen    += Number(r.green_count)    || 0;
+      totAmber    += Number(r.amber_count)    || 0;
+      totRed      += Number(r.red_count)      || 0;
+      totCough    += Number(r.cough_positive) || 0;
+      totReferral += Number(r.referral_count) || 0;
+    });
+
+    setText('tot-scans',    totScans);
+    setText('tot-green',    totGreen);
+    setText('tot-amber',    totAmber);
+    setText('tot-red',      totRed);
+    setText('tot-cough',    totCough);
+    setText('tot-referral', totReferral);
+
+    // ── Village cards ─────────────────────────────────────────────────
+    const container = document.getElementById('cards-container');
+    container.innerHTML = '';
+
+    // Sort: OUTBREAK first, then ELEVATED, then NORMAL
+    const rank = { OUTBREAK: 3, ELEVATED: 2, NORMAL: 1 };
+    const sorted = [...rows].sort(
+      (a, b) => (rank[b.alert_level] || 0) - (rank[a.alert_level] || 0)
+    );
+
+    sorted.forEach((row) => {
+      container.appendChild(buildCard(row));
+    });
+
+    // ── Live chip ─────────────────────────────────────────────────────
+    const chip = document.getElementById('live-chip');
+    chip.className = 'chip chip-green';
+    chip.innerHTML = '<span class="dot"></span> Live · ' + rows.length + ' area' + (rows.length !== 1 ? 's' : '');
+
+    showState('data');
+  }
+
+  /* ── Card builder ─────────────────────────────────────────────────── */
+
+  function buildCard(row) {
+    const level       = (row.alert_level || 'NORMAL').toUpperCase();
+    const geohash     = String(row.village_geohash || '????');
+    const dataSource  = String(row.data_source || '—');
+    const totalScans  = Number(row.total_scans)    || 0;
+    const greenCount  = Number(row.green_count)    || 0;
+    const amberCount  = Number(row.amber_count)    || 0;
+    const redCount    = Number(row.red_count)      || 0;
+    const coughPos    = Number(row.cough_positive) || 0;
+    const referrals   = Number(row.referral_count) || 0;
+    const lastAt      = row.last_recorded_at ? new Date(row.last_recorded_at) : null;
+    const isNonField  = dataSource !== 'field';
+
+    const coughPct = totalScans > 0
+      ? ((coughPos / totalScans) * 100).toFixed(0) + '%'
+      : '0%';
+
+    // Bar widths (percentage of total scans)
+    const toWidth = (n) => totalScans > 0 ? Math.max(4, Math.round(n / totalScans * 100)) : 0;
+    const greyWidth = 100 - toWidth(greenCount) - toWidth(amberCount) - toWidth(redCount);
+
+    const card = document.createElement('div');
+    card.className = 'village-card';
+    card.style.borderLeftColor = alertBorderColor(level);
+    card.style.background = alertBg(level);
+
+    // Ago label
+    let agoLabel = '—';
+    if (lastAt) {
+      const mins = Math.round((Date.now() - lastAt.getTime()) / 60000);
+      agoLabel = mins < 60
+        ? mins + 'm ago'
+        : mins < 1440
+        ? Math.round(mins / 60) + 'h ago'
+        : Math.round(mins / 1440) + 'd ago';
+    }
+
+    card.innerHTML =
+      '<div class="card-header">' +
+        '<div>' +
+          '<div class="card-village">' + esc(villageName(geohash)) + '</div>' +
+          '<div class="card-geo">geohash: ' + esc(geohash) + ' · updated ' + esc(agoLabel) + '</div>' +
+        '</div>' +
+        '<span class="chip ' + alertChipClass(level) + '">' + esc(level) + '</span>' +
+        (isNonField
+          ? '<span class="chip chip-amber" title="data_source: ' + esc(dataSource) + '">SIMULATED / PROTOTYPE</span>'
+          : '') +
+      '</div>' +
+
+      '<div class="card-stats">' +
+        buildStatPill(totalScans, 'Scans') +
+        buildStatPill(greenCount, 'GREEN',    'var(--green)') +
+        buildStatPill(amberCount, 'AMBER',    'var(--amber)') +
+        buildStatPill(redCount,   'RED',      'var(--red)') +
+        buildStatPill(coughPct,   'Cough+',   redCount > 0 || Number(coughPct) > 35 ? 'var(--amber)' : '') +
+        buildStatPill(referrals,  'Referrals','') +
+      '</div>' +
+
+      '<div class="bars-row">' +
+        '<div class="bar-seg" style="width:' + toWidth(greenCount) + '%;background:var(--green);"></div>' +
+        '<div class="bar-seg" style="width:' + toWidth(amberCount) + '%;background:var(--amber);"></div>' +
+        '<div class="bar-seg" style="width:' + toWidth(redCount)   + '%;background:var(--red);"></div>' +
+        (greyWidth > 0
+          ? '<div class="bar-seg" style="width:' + greyWidth + '%;background:var(--grey);"></div>'
+          : '') +
+      '</div>' +
+
+      '<div class="bars-legend">' +
+        '<span><span class="legend-dot" style="background:var(--green)"></span>Green ' + greenCount + '</span>' +
+        '<span><span class="legend-dot" style="background:var(--amber)"></span>Amber ' + amberCount + '</span>' +
+        '<span><span class="legend-dot" style="background:var(--red)"></span>Red ' + redCount + '</span>' +
+        '<span><span class="legend-dot" style="background:var(--grey)"></span>Grey (no colour) ' + Math.max(0, totalScans - greenCount - amberCount - redCount) + '</span>' +
+      '</div>';
+
+    return card;
+  }
+
+  function buildStatPill(value, label, color) {
+    return (
+      '<div class="stat-pill">' +
+        '<div class="val"' + (color ? ' style="color:' + color + '"' : '') + '>' + esc(value) + '</div>' +
+        '<div class="lbl">' + esc(label) + '</div>' +
+      '</div>'
+    );
+  }
+
+  /* ── Timestamp ──────────────────────────────────────────────────────── */
+
+  function updateRefreshTime() {
+    const el = document.getElementById('last-refresh');
+    if (el) el.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  }
+
+  /* ── Auto-refresh ────────────────────────────────────────────────────── */
+
+  loadData();
+  setInterval(loadData, CONFIG.REFRESH_MS);
 </script>
+
 </body>
 </html>
