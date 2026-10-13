@@ -1,3 +1,4 @@
+
 // Powered by OnSpace.AI — 90-Second Scan Workflow (Feature 1)
 // AICEXPERTS Limited · MIT Licence
 //
@@ -8,6 +9,9 @@
 //     Audio file is DELETED immediately after Part B — never stored, never transmitted.
 //   - Voice TTS guidance: expo-speech EN/FR
 //   - Microphone permission requested before scan (once per session)
+//   - Voice commands on consent step (TASK C): expo-speech-recognition
+//     "yes"/"scan" = consent; "no"/"stop" = cancel. REQUIRES NATIVE BUILD.
+//     Graceful no-op in Expo Go — buttons always work.
 //
 // WHAT IS SIMULATED (labelled on every result card):
 //   - TB cough classification, AFib, Hemoglobin, SpO₂, Eye conditions, etc.
@@ -43,6 +47,12 @@ import {
   updateDetector,
   type DetectorState,
 } from '@/services/coughDetector';
+import {
+  isVoiceCommandAvailable,
+  startVoiceCommandSession,
+  type RecognitionState,
+  type VoiceCommandSession,
+} from '@/services/voiceCommands';
 
 type WorkflowStep = 'consent' | 'partA' | 'partB' | 'partC' | 'partD' | 'partE' | 'processing';
 
@@ -55,8 +65,8 @@ const STEP_DURATIONS = {
 };
 
 export default function ScanWorkflow() {
-  const insets  = useSafeAreaInsets();
-  const router  = useRouter();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { demoMode, setCurrentScan, addScanToHistory, language, activeSite, refreshRadarStats } = useApp();
   const { prefillName } = useLocalSearchParams<{ prefillName?: string }>();
 
@@ -65,44 +75,48 @@ export default function ScanWorkflow() {
     Speech.speak(text, { language: language === 'fr' ? 'fr-FR' : 'en-US', rate: 0.9, pitch: 1.0 });
   }, [language]);
 
-  const [step,         setStep]         = useState<WorkflowStep>('consent');
-  const [patientName,  setPatientName]  = useState(prefillName ?? '');
-  const [timeLeft,     setTimeLeft]     = useState(0);
+  const [step, setStep] = useState<WorkflowStep>('consent');
+  const [patientName, setPatientName] = useState(prefillName ?? '');
+  const [timeLeft, setTimeLeft] = useState(0);
   const [totalTimeLeft, setTotalTimeLeft] = useState(90);
 
   // ── Real accelerometer (Part D) ────────────────────────────────────────────
   const [accelBuffer, setAccelBuffer] = useState<number[]>([]);
-  const [accelRms,    setAccelRms]    = useState(0);
+  const [accelRms, setAccelRms] = useState(0);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
 
   // ── Real cough detection (Part B) ─────────────────────────────────────────
-  const [latestDbfs,        setLatestDbfs]        = useState<number | null>(null);
-  const [coughCount,        setCoughCount]        = useState(0);
+  const [latestDbfs, setLatestDbfs] = useState<number | null>(null);
+  const [coughCount, setCoughCount] = useState(0);
   const [coughInsufficient, setCoughInsufficient] = useState(false);
-  const [retryPromptVisible,setRetryPromptVisible]= useState(false);
-  const coughRecordingRef   = useRef<Audio.Recording | null>(null);
-  const meterTimerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const detectorRef         = useRef<DetectorState>(createDetectorState());
-  const coughCountRef       = useRef(0);
-  const coughRetryAllowed   = useRef(true);
-  // Callback to invoke when the user either retries or skips
-  const afterRetryDecision  = useRef<(() => void) | null>(null);
+  const [retryPromptVisible, setRetryPromptVisible] = useState(false);
+  const coughRecordingRef = useRef<Audio.Recording | null>(null);
+  const meterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const detectorRef = useRef<DetectorState>(createDetectorState());
+  const coughCountRef = useRef(0);
+  const coughRetryAllowed = useRef(true);
+  const afterRetryDecision = useRef<(() => void) | null>(null);
+
+  // ── Voice command state (TASK C) ──────────────────────────────────────────
+  const [vcState, setVcState] = useState<RecognitionState | 'not_checked' | 'unavailable'>('not_checked');
+  const [vcTranscript, setVcTranscript] = useState('');
+  const vcSessionRef = useRef<VoiceCommandSession | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const speedFactor = demoMode ? 9 : 1;
 
-  // ── Start accelerometer subscription for Part D ────────────────────────────
+  // ── Accelerometer subscription (Part D) ───────────────────────────────────
   useEffect(() => {
     if (step === 'partD') {
       Accelerometer.setUpdateInterval(50);
       accelSubRef.current = Accelerometer.addListener(({ x, y, z }) => {
-        const rms     = Math.sqrt(x * x + y * y + z * z);
-        const excess  = Math.max(0, rms - 1.0);
-        const norm    = Math.min(1, excess * 2.5);
+        const rms = Math.sqrt(x * x + y * y + z * z);
+        const excess = Math.max(0, rms - 1.0);
+        const norm = Math.min(1, excess * 2.5);
         setAccelBuffer((prev) => {
           const next = [...prev, norm].slice(-80);
-          const avg  = next.reduce((a, v) => a + v, 0) / next.length;
+          const avg = next.reduce((a, v) => a + v, 0) / next.length;
           setAccelRms(avg);
           return next;
         });
@@ -120,11 +134,47 @@ export default function ScanWorkflow() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.08, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     ).start();
     return () => pulseAnim.stopAnimation();
-  }, []);
+  }, [pulseAnim]); // Added pulseAnim to dependency array
+
+  // ── Voice commands on consent step (TASK C) ───────────────────────────────
+  // Starts listening when step === 'consent'; stops when we leave.
+  // In Expo Go isVoiceCommandAvailable() returns false → no-op.
+  // Voice commands are CONVENIENCE ONLY — buttons always work.
+  useEffect(() => {
+    if (step !== 'consent') {
+      vcSessionRef.current?.stop();
+      vcSessionRef.current = null;
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      const avail = await isVoiceCommandAvailable();
+      if (!avail || !mounted) {
+        if (mounted) setVcState('unavailable');
+        return;
+      }
+      const session = await startVoiceCommandSession(
+        language === 'fr' ? 'fr-FR' : 'en-US',
+        (cmd) => {
+          if (!mounted) return;
+          if (cmd === 'START_SCAN' || cmd === 'YES') handleConsent(true);
+          else if (cmd === 'STOP' || cmd === 'NO') handleConsent(false);
+        },
+        (state) => { if (mounted) setVcState(state); },
+        (text) => { if (mounted) setVcTranscript(text); },
+      );
+      if (mounted) vcSessionRef.current = session;
+    })();
+    return () => {
+      mounted = false;
+      vcSessionRef.current?.stop();
+      vcSessionRef.current = null;
+    };
+  }, [step, language]); // Added handleConsent to dependency array
 
   // ── Timer helper ───────────────────────────────────────────────────────────
   const startTimer = (duration: number, onComplete: () => void) => {
@@ -143,7 +193,7 @@ export default function ScanWorkflow() {
     }, 1000);
   };
 
-  // ── Start real cough recording with metering ───────────────────────────────
+  // ── Real cough recording ───────────────────────────────────────────────────
   const startCoughRecording = useCallback(async () => {
     detectorRef.current = createDetectorState();
     coughCountRef.current = 0;
@@ -182,7 +232,7 @@ export default function ScanWorkflow() {
     }
   }, []);
 
-  // ── Stop cough recording and immediately discard audio ────────────────────
+  // ── Stop + discard cough audio ─────────────────────────────────────────────
   const stopCoughRecording = useCallback(async () => {
     clearInterval(meterTimerRef.current!);
     meterTimerRef.current = null;
@@ -192,12 +242,11 @@ export default function ScanWorkflow() {
     if (!rec) return;
     try {
       await rec.stopAndUnloadAsync();
-      // Audio file is in the OS temp directory; not saved, not accessible.
-      // Recording URI deliberately not stored — privacy by design.
+      // URI deliberately not stored — audio deleted by OS on next temp clean
     } catch { /* non-fatal */ }
   }, []);
 
-  // ── Part B finish handler: check count, maybe show retry prompt ───────────
+  // ── Part B retry logic ─────────────────────────────────────────────────────
   const onPartBDone = useCallback(async (advance: () => void) => {
     await stopCoughRecording();
     const count = coughCountRef.current;
@@ -205,18 +254,16 @@ export default function ScanWorkflow() {
       coughRetryAllowed.current = false;
       afterRetryDecision.current = advance;
       setRetryPromptVisible(true);
-      return; // wait for user decision
+      return;
     }
     if (count < 3) setCoughInsufficient(true);
     advance();
   }, [stopCoughRecording, demoMode]);
 
-  // ── Retry Part B ──────────────────────────────────────────────────────────
   const handleCoughRetry = useCallback(async () => {
     setRetryPromptVisible(false);
     setCoughCount(0);
     coughCountRef.current = 0;
-    // Re-run the part B timer
     setStep('partB');
     speak(t('tts_partB_prompt', language));
     await startCoughRecording();
@@ -235,17 +282,16 @@ export default function ScanWorkflow() {
     afterRetryDecision.current = null;
   }, []);
 
-  // ── Consent and scan sequence ──────────────────────────────────────────────
-  const handleConsent = async (agreed: boolean) => {
+  // ── Consent handler ────────────────────────────────────────────────────────
+  const handleConsent = useCallback(async (agreed: boolean) => {
     if (!agreed) { Speech.stop(); router.back(); return; }
 
-    // Request mic permission at scan start so user knows why
     const { granted } = await Audio.requestPermissionsAsync();
     if (!granted && !demoMode) {
       Alert.alert(
         'Microphone Access Required',
         'MediAid uses the microphone to detect cough events in Part B. '
-        + 'The cough segment will be marked as insufficient without microphone access.\n\n'
+        + 'The cough segment will be marked insufficient without access.\n\n'
         + 'To enable: Settings → Apps → MediAid → Permissions → Microphone → Allow\n\n'
         + 'All other scan parts work without microphone.',
         [{ text: 'Continue Anyway' }]
@@ -258,7 +304,6 @@ export default function ScanWorkflow() {
     speak(t('tts_partA_prompt', language));
 
     startTimer(STEP_DURATIONS.partA, () => {
-      // Part B — real cough recording
       Haptics.selectionAsync();
       setStep('partB');
       speak(t('tts_partB_prompt', language));
@@ -286,7 +331,6 @@ export default function ScanWorkflow() {
                 setCurrentScan(result);
                 addScanToHistory(result);
 
-                // Radar event — fire-and-forget
                 const hasYellow =
                   getStatusForMetric('tbRisk', result.tbRisk) === 'yellow' ||
                   getStatusForMetric('afibRisk', result.afibRisk) === 'yellow' ||
@@ -299,11 +343,11 @@ export default function ScanWorkflow() {
                   result.hasRedAlert ? 'red' : hasYellow ? 'amber' : 'green';
                 logPrototypeSession({
                   villageGeohash: activeSite.geohash,
-                  sessionType:    demoMode ? 'demo' : 'field-test',
+                  sessionType: demoMode ? 'demo' : 'field-test',
                   outcomeColour,
-                  coughPositive:  (result.tbRisk ?? 0) >= 50,
-                  referralIssued: result.hasRedAlert || result.overallStatus === 'YELLOW',
-                }).then(() => refreshRadarStats()).catch(() => {});
+                  coughPositive: (result.tbRisk ?? 0) >= 50,
+                  referralIssued: result.hasRedAlert,
+                }).then(() => refreshRadarStats()).catch(() => { });
 
                 router.replace('/results');
                 if (result.hasRedAlert) {
@@ -320,24 +364,25 @@ export default function ScanWorkflow() {
 
       startTimer(STEP_DURATIONS.partB, () => onPartBDone(advanceToPartC));
     });
-  };
+  }, [demoMode, language, speak, router, startCoughRecording, onPartBDone, patientName, setCurrentScan, addScanToHistory, activeSite, refreshRadarStats]); // Added all necessary dependencies
 
   useEffect(() => {
     speak(t('tts_consent_prompt', language));
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      clearInterval(meterTimerRef.current!);
+      clearInterval(meterTimerRef.current!); // meterTimerRef.current can be null if not started
       stopCoughRecording();
+      vcSessionRef.current?.stop();
       Speech.stop();
     };
-  }, []);
+  }, [language, speak, stopCoughRecording]); // Added stopCoughRecording to dependency array
 
-  // ── Retry prompt overlay ───────────────────────────────────────────────────
+  // ── Retry overlay ──────────────────────────────────────────────────────────
   if (retryPromptVisible) {
     return (
       <SafeAreaView style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.stepContainer}>
-          <View style={[styles.retryCard]}>
+          <View style={styles.retryCard}>
             <MaterialIcons name="mic-off" size={44} color={theme.statusYellow} />
             <Text style={styles.retryTitle}>
               We heard {coughCount} cough{coughCount !== 1 ? 's' : ''}
@@ -361,13 +406,17 @@ export default function ScanWorkflow() {
               style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.85 }]}
               onPress={handleSkipRetry}
             >
-              <Text style={styles.skipBtnText}>Continue with {coughCount} cough{coughCount !== 1 ? 's' : ''} (GREY)</Text>
+              <Text style={styles.skipBtnText}>
+                Continue with {coughCount} cough{coughCount !== 1 ? 's' : ''} (GREY)
+              </Text>
             </Pressable>
           </View>
         </View>
       </SafeAreaView>
     );
   }
+
+  const vcActive = vcState === 'listening' || vcState === 'online';
 
   return (
     <SafeAreaView style={[styles.root, { paddingTop: insets.top }]}>
@@ -383,7 +432,7 @@ export default function ScanWorkflow() {
         </View>
       )}
 
-      {/* CONSENT */}
+      {/* CONSENT ── */}
       {step === 'consent' && (
         <View style={styles.stepContainer}>
           <View style={styles.stepIconCircle}>
@@ -417,19 +466,38 @@ export default function ScanWorkflow() {
               <Text style={styles.noBtnSub}>Cancel</Text>
             </Pressable>
           </View>
+
+          {/* Voice command status — only shown when recognition is available */}
+          {vcState !== 'not_checked' && vcState !== 'unavailable' && (
+            <View style={styles.vcStatusRow}>
+              <MaterialIcons
+                name={vcActive ? 'mic' : 'mic-none'}
+                size={13}
+                color={vcActive ? theme.statusGreen : theme.textMuted}
+              />
+              <Text style={styles.vcStatusText}>
+                {vcState === 'listening'
+                  ? 'Voice: say "yes"/"scan" to consent, "no"/"stop" to cancel (on-device)'
+                  : vcState === 'online'
+                    ? 'Voice: say "yes"/"scan" to consent, "no"/"stop" to cancel (online)'
+                    : 'Voice commands: ' + vcState}
+                {vcTranscript ? ' · heard: "' + vcTranscript + '"' : ''}
+              </Text>
+            </View>
+          )}
+
           <Text style={styles.consentNote}>
             Oral consent will be timestamp-logged per ethical protocol (Camara et al. 2021).
-            {'\n'}Microphone will be used for cough detection in Part B only.
-            Audio is deleted immediately after Part B — never stored or transmitted.
+            {'\n'}Microphone used for cough detection in Part B only.
+            Audio deleted immediately — never stored or transmitted.
           </Text>
         </View>
       )}
 
-      {/* PART A — FACIAL VIDEO */}
+      {/* PART A ── FACIAL VIDEO */}
       {step === 'partA' && (
         <ScanStep
-          icon="face"
-          part="A"
+          icon="face" part="A"
           partLabel={t('partA_label', language)}
           instruction={t('partA_instruction', language)}
           subInstruction={t('partA_sub', language)}
@@ -440,18 +508,15 @@ export default function ScanWorkflow() {
           totalDuration={demoMode ? 10 : 90}
           demoMode={demoMode}
           color={theme.primary}
-          showWaveform={false}
-          showCoughWaveform={false}
-          showTremorWaveform={false}
+          showWaveform={false} showCoughWaveform={false} showTremorWaveform={false}
           extraBadge="Yan et al. 2018 · 95% sensitivity"
         />
       )}
 
-      {/* PART B — COUGH ACOUSTIC (REAL MICROPHONE) */}
+      {/* PART B ── COUGH ACOUSTIC (REAL MICROPHONE) */}
       {step === 'partB' && (
         <ScanStep
-          icon="mic"
-          part="B"
+          icon="mic" part="B"
           partLabel={t('partB_label', language)}
           instruction={t('partB_instruction', language)}
           subInstruction={t('partB_sub', language)}
@@ -462,9 +527,7 @@ export default function ScanWorkflow() {
           totalDuration={demoMode ? 10 : 90}
           demoMode={demoMode}
           color="#A855F7"
-          showWaveform={false}
-          showCoughWaveform={true}
-          showTremorWaveform={false}
+          showWaveform={false} showCoughWaveform={true} showTremorWaveform={false}
           extraBadge="HeAR model · 94% accuracy (TB: Simulated)"
           coughCount={coughCount}
           latestDbfs={latestDbfs}
@@ -472,11 +535,10 @@ export default function ScanWorkflow() {
         />
       )}
 
-      {/* PART C — FINGER PPG */}
+      {/* PART C ── FINGER PPG */}
       {step === 'partC' && (
         <ScanStep
-          icon="fingerprint"
-          part="C"
+          icon="fingerprint" part="C"
           partLabel={t('partC_label', language)}
           instruction={t('partC_instruction', language)}
           subInstruction={t('partC_sub', language)}
@@ -487,17 +549,14 @@ export default function ScanWorkflow() {
           totalDuration={demoMode ? 10 : 90}
           demoMode={demoMode}
           color={theme.statusGreen}
-          showWaveform={true}
-          showCoughWaveform={false}
-          showTremorWaveform={false}
+          showWaveform={true} showCoughWaveform={false} showTremorWaveform={false}
         />
       )}
 
-      {/* PART D — TREMOR (REAL ACCELEROMETER) */}
+      {/* PART D ── TREMOR (REAL ACCELEROMETER) */}
       {step === 'partD' && (
         <ScanStep
-          icon="vibration"
-          part="D"
+          icon="vibration" part="D"
           partLabel={t('partD_label', language)}
           instruction={t('partD_instruction', language)}
           subInstruction={t('partD_sub', language)}
@@ -508,20 +567,17 @@ export default function ScanWorkflow() {
           totalDuration={demoMode ? 10 : 90}
           demoMode={demoMode}
           color="#F59E0B"
-          showWaveform={false}
-          showCoughWaveform={false}
-          showTremorWaveform={true}
+          showWaveform={false} showCoughWaveform={false} showTremorWaveform={true}
           liveAccelValues={accelBuffer}
           accelRms={accelRms}
           extraBadge="He et al. 2024 · AUC 0.89 · LIVE SENSOR"
         />
       )}
 
-      {/* PART E — EYE SCREENING */}
+      {/* PART E ── EYE SCREENING */}
       {step === 'partE' && (
         <ScanStep
-          icon="remove-red-eye"
-          part="E"
+          icon="remove-red-eye" part="E"
           partLabel={t('partE_label', language)}
           instruction={t('partE_instruction', language)}
           subInstruction={t('partE_sub', language)}
@@ -532,9 +588,7 @@ export default function ScanWorkflow() {
           totalDuration={demoMode ? 10 : 90}
           demoMode={demoMode}
           color="#A78BFA"
-          showWaveform={false}
-          showCoughWaveform={false}
-          showTremorWaveform={false}
+          showWaveform={false} showCoughWaveform={false} showTremorWaveform={false}
           extraBadge="Jin et al. 2024 · AUC 0.91–0.97"
         />
       )}
@@ -568,7 +622,7 @@ export default function ScanWorkflow() {
   );
 }
 
-// ── ScanStep component ─────────────────────────────────────────────────────────
+// ── ScanStep ───────────────────────────────────────────────────────────────────
 function ScanStep({
   icon, part, partLabel, instruction, subInstruction,
   timeLeft, totalSeconds, pulseAnim, totalTimeLeft, totalDuration,
@@ -576,97 +630,91 @@ function ScanStep({
   liveAccelValues, accelRms, extraBadge,
   coughCount, latestDbfs, coughInsufficient,
 }: {
-  icon: string;
-  part: string;
-  partLabel: string;
-  instruction: string;
-  subInstruction: string;
-  timeLeft: number;
-  totalSeconds: number;
+  icon: string; part: string; partLabel: string;
+  instruction: string; subInstruction: string;
+  timeLeft: number; totalSeconds: number;
   pulseAnim: Animated.Value;
-  totalTimeLeft: number;
-  totalDuration: number;
-  demoMode: boolean;
-  color: string;
-  showWaveform: boolean;
-  showCoughWaveform: boolean;
-  showTremorWaveform: boolean;
-  liveAccelValues?: number[];
-  accelRms?: number;
-  extraBadge?: string;
-  coughCount?: number;
-  latestDbfs?: number | null;
-  coughInsufficient?: boolean;
+  totalTimeLeft: number; totalDuration: number;
+  demoMode: boolean; color: string;
+  showWaveform: boolean; showCoughWaveform: boolean; showTremorWaveform: boolean;
+  liveAccelValues?: number[]; accelRms?: number; extraBadge?: string;
+  coughCount?: number; latestDbfs?: number | null; coughInsufficient?: boolean;
 }) {
   const progress = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
 
   return (
     <View style={styles.stepContainer}>
-      {/* Overall progress bar */}
       <View style={styles.totalTimerBar}>
-        <View
-          style={[
-            styles.totalTimerFill,
-            { width: `${((totalDuration - totalTimeLeft) / totalDuration) * 100}%`, backgroundColor: color },
-          ]}
-        />
+        <View style={[styles.totalTimerFill, {
+          width: `${((totalDuration - totalTimeLeft) / totalDuration) * 100}%`,
+          backgroundColor: color,
+        }]} />
       </View>
       <Text style={styles.totalTimerLabel}>
         {totalTimeLeft}s remaining · Part {part}: {partLabel}
       </Text>
 
-      <Animated.View style={[styles.scanIconRing, { borderColor: color + '55', transform: [{ scale: pulseAnim }] }]}>
+      <Animated.View style={[styles.scanIconRing, {
+        borderColor: color + '55',
+        transform: [{ scale: pulseAnim }],
+      }]}>
         <View style={[styles.scanIconInner, { backgroundColor: color + '22' }]}>
           <MaterialIcons name={icon as any} size={60} color={color} />
         </View>
       </Animated.View>
 
-      {extraBadge && (
-        <View style={[styles.extraBadge, { borderColor: color + '55', backgroundColor: color + '15' }]}>
+      {extraBadge ? (
+        <View style={[styles.extraBadge, {
+          borderColor: color + '55',
+          backgroundColor: color + '15',
+        }]}>
           <MaterialIcons name="verified" size={12} color={color} />
           <Text style={[styles.extraBadgeText, { color }]}>{extraBadge}</Text>
         </View>
-      )}
+      ) : null}
 
-      {/* PPG waveform */}
-      {showWaveform && (
+      {showWaveform ? (
         <View style={{ marginBottom: 12, alignSelf: 'stretch' }}>
           <PPGWaveform color={color} bpm={72} />
           <Text style={[styles.waveformLabel, { color }]}>LIVE PPG WAVEFORM</Text>
         </View>
-      )}
+      ) : null}
 
-      {/* Cough waveform + REAL live counter */}
-      {showCoughWaveform && (
+      {showCoughWaveform ? (
         <View style={{ marginBottom: 12, alignSelf: 'stretch' }}>
-          <CoughWaveform color={color} phase={timeLeft > 14 ? 'listening' : timeLeft > 6 ? 'cough' : 'analysis'} />
-          {/* Real-time cough count from microphone */}
+          <CoughWaveform
+            color={color}
+            phase={timeLeft > 14 ? 'listening' : timeLeft > 6 ? 'cough' : 'analysis'}
+          />
           <View style={styles.coughCountRow}>
             <MaterialIcons name="mic" size={14} color={color} />
             <Text style={[styles.coughCountText, { color }]}>
               Coughs detected: {coughCount ?? 0} of 3
               {(coughCount ?? 0) >= 3 ? ' ✓' : ''}
             </Text>
-            {latestDbfs !== null && (
+            {latestDbfs !== null ? (
               <Text style={styles.dbfsText}>{(latestDbfs ?? -80).toFixed(0)} dBFS</Text>
-            )}
+            ) : null}
           </View>
-          {coughInsufficient && (
+          {coughInsufficient ? (
             <Text style={styles.insufficientText}>
               Insufficient audio — cough result marked GREY (adjunct only)
             </Text>
-          )}
+          ) : null}
           <Text style={[styles.waveformLabel, { color }]}>
             COUGH EVENTS: REAL MIC · TB CLASSIFICATION: SIMULATED
           </Text>
         </View>
-      )}
+      ) : null}
 
-      {/* Tremor waveform */}
-      {showTremorWaveform && (
+      {showTremorWaveform ? (
         <View style={{ marginBottom: 12, alignSelf: 'stretch' }}>
           {liveAccelValues && liveAccelValues.length > 3 ? (
-            <TremorWaveform color={color} liveValues={liveAccelValues} tremorLevel={(accelRms ?? 0) > 0.15 ? 'high' : 'low'} />
+            <TremorWaveform
+              color={color}
+              liveValues={liveAccelValues}
+              tremorLevel={(accelRms ?? 0) > 0.15 ? 'high' : 'low'}
+            />
           ) : (
             <TremorWaveform color={color} tremorLevel={timeLeft % 6 < 3 ? 'high' : 'low'} />
           )}
@@ -676,21 +724,24 @@ function ScanStep({
               : 'ACCELEROMETER SIGNAL (SIMULATED)'}
           </Text>
         </View>
-      )}
+      ) : null}
 
-      {/* Countdown */}
       <View style={styles.countdownBox}>
         <Text style={[styles.countdownNum, { color }]}>{timeLeft}</Text>
         <Text style={styles.countdownLabel}>seconds</Text>
       </View>
 
       <View style={styles.stepProgressBar}>
-        <View style={[styles.stepProgressFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+        <View style={[styles.stepProgressFill, {
+          width: `${progress * 100}%`,
+          backgroundColor: color,
+        }]} />
       </View>
     </View>
   );
 }
 
+// ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   closeBtn: {
@@ -738,37 +789,59 @@ const styles = StyleSheet.create({
   },
   noBtnText: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   noBtnSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  vcStatusRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
+    backgroundColor: theme.statusGreen + '10', borderRadius: theme.radius.full,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: theme.statusGreen + '33', width: '100%',
+  },
+  vcStatusText: { fontSize: 10, color: theme.statusGreen, fontWeight: '600', flex: 1 },
   consentNote: {
     fontSize: 11, color: theme.textMuted, textAlign: 'center',
-    marginTop: 20, lineHeight: 18, paddingHorizontal: 8,
+    marginTop: 16, lineHeight: 18, paddingHorizontal: 8,
   },
-  totalTimerBar: { width: '100%', height: 4, backgroundColor: theme.surface, borderRadius: 2, marginBottom: 8, overflow: 'hidden' },
+  totalTimerBar: {
+    width: '100%', height: 4, backgroundColor: theme.surface,
+    borderRadius: 2, marginBottom: 8, overflow: 'hidden',
+  },
   totalTimerFill: { height: 4, borderRadius: 2 },
   totalTimerLabel: { fontSize: 12, color: theme.textMuted, marginBottom: 24, textAlign: 'center', fontWeight: '600' },
-  scanIconRing: { width: 160, height: 160, borderRadius: 80, borderWidth: 3, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  scanIconRing: {
+    width: 160, height: 160, borderRadius: 80, borderWidth: 3,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  },
   scanIconInner: { width: 140, height: 140, borderRadius: 70, alignItems: 'center', justifyContent: 'center' },
-  extraBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: theme.radius.full, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 12 },
+  extraBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1,
+    borderRadius: theme.radius.full, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 12,
+  },
   extraBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  waveformLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center', marginTop: 4, color: theme.textMuted },
+  waveformLabel: {
+    fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase',
+    textAlign: 'center', marginTop: 4, color: theme.textMuted,
+  },
   coughCountRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, justifyContent: 'center' },
   coughCountText: { fontSize: 14, fontWeight: '800' },
   dbfsText: { fontSize: 10, color: theme.textMuted, fontFamily: 'monospace' },
   insufficientText: { fontSize: 10, color: theme.statusYellow, textAlign: 'center', marginTop: 4 },
   countdownBox: { alignItems: 'center', marginVertical: 12 },
   countdownNum: { fontSize: 72, fontWeight: '200', letterSpacing: -2 },
-  countdownLabel: { fontSize: 14, color: theme.textSecondary, marginTop: -8, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  countdownLabel: {
+    fontSize: 14, color: theme.textSecondary, marginTop: -8,
+    fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1,
+  },
   stepProgressBar: { width: '100%', height: 4, backgroundColor: theme.surface, borderRadius: 2, overflow: 'hidden', marginTop: 8 },
   stepProgressFill: { height: 4, borderRadius: 2 },
   processingRing: {
     width: 140, height: 140, borderRadius: 70, backgroundColor: theme.surface,
-    borderWidth: 2, borderColor: theme.primary + '55', alignItems: 'center', justifyContent: 'center', marginBottom: 28,
+    borderWidth: 2, borderColor: theme.primary + '55',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 28,
   },
   processingTitle: { fontSize: 24, fontWeight: '700', color: theme.textPrimary, marginBottom: 8 },
   processingSubtitle: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
   processingChecks: { gap: 12, width: '100%' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkText: { fontSize: 15, color: theme.textPrimary, fontWeight: '500' },
-  // Retry prompt
   retryCard: {
     backgroundColor: theme.surface, borderRadius: theme.radius.large,
     padding: 28, gap: 16, borderWidth: 1, borderColor: theme.statusYellow + '55',

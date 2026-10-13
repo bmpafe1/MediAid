@@ -26,6 +26,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow MediAid to use the microphone for cough detection and optional voice commands.",
+          "speechRecognitionPermission": "Allow MediAid to use speech recognition for optional voice commands (en-US and fr-FR only).",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.png",
