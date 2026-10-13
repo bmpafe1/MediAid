@@ -8,6 +8,8 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-blue)](https://reactnative.dev)
 [![Built with Expo](https://img.shields.io/badge/Built%20with-Expo%2053-black)](https://expo.dev)
 [![Outbreak Radar](https://img.shields.io/badge/Live%20Data-Outbreak%20Radar-teal)](https://bmpafe1.github.io/MediAid)
+[![CI](https://github.com/bmpafe1/MediAid/actions/workflows/ci.yml/badge.svg)](https://github.com/bmpafe1/MediAid/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-see%20docs%2Fcoverage.md-blue)](docs/coverage.md)
 
 ---
 
@@ -29,7 +31,7 @@ This repository contains the **fully navigable functional prototype**: the user 
 |---|---|
 | Peer-reviewed studies validating AI capabilities | 25+ |
 | Validated clinical capabilities | 16+ |
-| Voice navigation languages | English and French (more languages planned) |
+| Voice navigation languages | English and French voice prompts (more languages planned) |
 | Cost per consultation | USD 0.22 |
 | Autonomous scan duration | 90 seconds |
 | Marginal cost per additional condition | USD 0.00 |
@@ -47,7 +49,7 @@ Six documented failure modes have prevented every prior mHealth deployment from 
 |---|---|---|
 | Poor CHW usability | Tools built without CHW co-design lead to abandonment | Three-session co-design with named CHAs before deployment. Voice-first, one-word protocol. No menus. No literacy required. |
 | Connectivity dependency | Ada Health, Babylon, HEP Assist all require internet; Babylon withdrew from Africa entirely | 100% offline-first. Zero life-critical function requires any connectivity. |
-| Language and literacy exclusion | English/French interfaces exclude 773 million non-literate adults | Voice navigation in 200+ languages including Fulfuldé, Hausa, Lingala. Oral consent recorded. |
+| Language and literacy exclusion | English/French interfaces exclude rural communities | Voice navigation in English and French; oral consent recorded; more languages planned. |
 | CHW disempowerment and attrition | Algorithmic management leads to attrition; only 17% of mHealth-enabled CHWs performed optimally in one Uganda study | Traditional authority endorsement elevates CHA status. MediAid professionalises and empowers — not surveils. |
 | Algorithmic bias on African populations | AI trained on non-African data systematically underperforms on African patients | African AI Equity Validation Protocol: four peer-reviewed workstreams with Makerere AI Lab and University of Buea. |
 | No community trust mechanism | Tools deployed without community leadership face resistance regardless of clinical quality | Chief endorsement documented. CHA nominated by traditional authority. Social accountability is the adoption mechanism. |
@@ -392,6 +394,27 @@ pnpm ios
 # Run in browser
 pnpm web
 ```
+
+### Tests and Coverage
+
+Coverage is measured **only on the logic modules** — not on UI screens or fixtures.
+Covered modules: `alertRule`, `coughDetector`, `deidentify`, `modelRegistry`, `radarQueue`, `safetyScreen`, `triage`.
+See [`docs/coverage.md`](docs/coverage.md) for the full scope and latest report.
+
+```bash
+# Run tests (watch mode)
+pnpm test
+
+# Run tests with coverage (CI mode)
+pnpm test:ci
+
+# TypeScript type-check only
+pnpm typecheck
+
+# Coverage report: open coverage/lcov-report/index.html
+```
+
+**Coverage threshold:** 80% lines / branches / functions / statements for all in-scope files.
 
 ### Project Structure
 
