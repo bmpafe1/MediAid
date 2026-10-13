@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { theme } from '@/constants/theme';
 import { useApp } from '@/contexts/AppContext';
 import { t } from '@/constants/i18n';
-import { generateMockScanResult, generateDemoRedResult } from '@/services/mockData';
+import { generateMockScanResult, generateDemoRedResult, getStatusForMetric } from '@/services/mockData';
 import { logPrototypeSession } from '@/services/outbreakRadar';
 import { Accelerometer } from 'expo-sensors';
 import { PPGWaveform } from '@/components/PPGWaveform';
@@ -157,7 +157,6 @@ export default function ScanWorkflow() {
 
                 // --- Radar event: fire-and-forget, never blocks UI ---
                 // Derive 4-colour outcome from scan metrics
-                const { getStatusForMetric } = await import('@/services/mockData');
                 const hasYellow =
                   getStatusForMetric('tbRisk', result.tbRisk) === 'yellow' ||
                   getStatusForMetric('afibRisk', result.afibRisk) === 'yellow' ||
