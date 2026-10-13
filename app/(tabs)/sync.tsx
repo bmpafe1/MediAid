@@ -1,3 +1,4 @@
+
 /**
  * MediAid · app/(tabs)/sync.tsx
  * AICEXPERTS Limited · MIT Licence
@@ -22,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import * as Haptics from 'expo-haptics';
 import * as SMS from '@/services/smsService';
+import { useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Alert,
@@ -186,7 +188,7 @@ export default function SyncScreen() {
       setFlushError(String(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-  }, [flushState, radarPendingCount]);
+  }, [flushState, radarPendingCount, addSyncRecord, refreshRadarStats, pulseAnim]);
 
   // ----- Debug panel -----
   const toggleDebug = useCallback(async () => {
@@ -423,6 +425,7 @@ export default function SyncScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.settingLabel}>{t('sync_language', language)}</Text>
               <Text style={styles.settingDesc}>{t('sync_language_desc', language)}</Text>
+              <Text style={styles.settingDesc}>English and French voice prompts (more languages planned)</Text>
             </View>
             {(['en', 'fr'] as const).map((lang) => (
               <Pressable
@@ -437,6 +440,10 @@ export default function SyncScreen() {
             ))}
           </View>
         </View>
+
+        {/* ── Voice Self-Test ── */}
+        <Text style={styles.sectionTitle}>MICROPHONE DIAGNOSTIC</Text>
+        <VoiceSelfTestLink />
 
         {/* ── DHIS2 / FHIR (Planned) ── */}
         <Text style={styles.sectionTitle}>DHIS2 / FHIR R4 INTEGRATION</Text>
@@ -595,6 +602,37 @@ export default function SyncScreen() {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+// VoiceSelfTestLink — shown in the Sync screen diagnostic section
+function VoiceSelfTestLink() {
+  const router = useRouter();
+  return (
+    <Pressable
+      style={({ pressed }) => [{
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        gap: 10,
+        backgroundColor: theme.surface,
+        borderRadius: theme.radius.medium,
+        padding: 14,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: theme.border,
+        opacity: pressed ? 0.8 : 1,
+      }]}
+      onPress={() => router.push('/voice-selftest')}
+    >
+      <MaterialIcons name="mic" size={20} color={theme.primary} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textPrimary }}>Voice / Mic Self-Test</Text>
+        <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
+          Verify microphone permission, live level meter, test recording and playback
+        </Text>
+      </View>
+      <MaterialIcons name="chevron-right" size={20} color={theme.textMuted} />
+    </Pressable>
+  );
+}
 
 function StatCard({
   label, value, color, small,

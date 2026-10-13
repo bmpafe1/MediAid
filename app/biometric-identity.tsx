@@ -1,6 +1,27 @@
+
 // MediAid — Biometric Patient Identity (v10)
-// Voice print + facial geometry hash matching for longitudinal patient tracking
-// No biometric image stored — anonymised hash only. Matching is GREY adjunct flag only.
+// SIMULATED PROTOTYPE — reads clearly as such on every screen.
+//
+// WHAT IS REAL ABOUT THIS SCREEN:
+//   - The privacy architecture is correctly described (hash-only, no raw storage,
+//     biometric hashes excluded from sync transmission)
+//   - The UI workflow and patient registry are functional
+//   - The ethics and consent design are genuine
+//
+// WHAT IS SIMULATED (labelled throughout this file and on screen):
+//   - The microphone is NEVER opened on this screen
+//   - The 5-second timer is a countdown only — no audio is captured
+//   - generateMockHash() produces a deterministic hex string, NOT a real voice print
+//   - Matching uses Math.random() — NOT real feature-vector cosine similarity
+//   - All match confidence percentages are randomly generated
+//
+// WHY: Real voice-print capture requires PCM access not available via expo-av on Android
+// (it records compressed AAC/AMR). A validated PCM library (@siteed/expo-audio-studio
+// or react-native-audio-record) plus MFCC extraction is required for real implementation.
+// That integration is planned for Phase 1 field validation.
+//
+// TASK D decision: relabelling path taken — no Math.random() matching is presented
+// as if it were a real biometric comparison anywhere in the UI.
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -407,8 +428,8 @@ export default function BiometricIdentityScreen() {
           <MaterialIcons name="arrow-back" size={22} color={theme.textPrimary} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={styles.navTitle}>Biometric Patient Identity</Text>
-          <Text style={styles.navSub}>MediAid v10 · Longitudinal matching</Text>
+          <Text style={styles.navTitle}>Voice Identity (Simulated)</Text>
+          <Text style={styles.navSub}>MediAid v10 · Prototype — not yet validated</Text>{/* Closing tag added here */}
         </View>
         <View style={styles.v10Badge}>
           <Text style={styles.v10BadgeText}>NEW v10</Text>
@@ -421,6 +442,23 @@ export default function BiometricIdentityScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Privacy notice */}
+        {/* SIMULATED banner — must be visible at all times */}
+        <View style={styles.simBanner}>
+          <MaterialIcons name="science" size={16} color={theme.statusYellow} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.simBannerTitle}>This screen does not record or match your voice yet</Text>
+            <Text style={styles.simBannerText}>
+              The microphone is not opened. The 5-second timer is cosmetic. Hash values are
+              deterministic hex strings, not real voice prints. Matching uses a random number,
+              not feature-vector comparison. This is a prototype workflow only.
+            </Text>
+            <Text style={styles.simBannerText}>
+              Real implementation requires PCM capture + MFCC extraction — planned for Phase 1
+              field validation. No Math.random() match result is used in any clinical flow.
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.privacyCard}>
           <View style={styles.privacyIconRow}>
             <MaterialIcons name="lock" size={18} color={theme.statusGreen} />
@@ -711,4 +749,12 @@ const styles = StyleSheet.create({
   pilotMetricVal: { fontSize: 18, fontWeight: '800' },
   pilotMetricLabel: { fontSize: 10, color: theme.textMuted, fontWeight: '600', textAlign: 'center' },
   footer: { fontSize: 11, color: theme.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 17 },
+  simBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: theme.statusYellow + '10', borderRadius: theme.radius.medium,
+    padding: 14, marginTop: 16, marginBottom: 0,
+    borderWidth: 2, borderColor: theme.statusYellow + '66',
+  },
+  simBannerTitle: { fontSize: 13, fontWeight: '800', color: theme.statusYellow, marginBottom: 4 },
+  simBannerText: { fontSize: 11, color: theme.textMuted, lineHeight: 17, marginBottom: 4 },
 });

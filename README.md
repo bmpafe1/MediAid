@@ -29,7 +29,7 @@ This repository contains the **fully navigable functional prototype**: the user 
 |---|---|
 | Peer-reviewed studies validating AI capabilities | 25+ |
 | Validated clinical capabilities | 16+ |
-| Voice navigation languages | 200+ |
+| Voice navigation languages | English and French (more languages planned) |
 | Cost per consultation | USD 0.22 |
 | Autonomous scan duration | 90 seconds |
 | Marginal cost per additional condition | USD 0.00 |

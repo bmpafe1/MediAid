@@ -543,7 +543,7 @@ export default function SelfHealingAIScreen() {
               { icon: 'check', text: 'No engineer needed in the field', color: theme.statusGreen },
               { icon: 'check', text: 'No raw biometric data transmitted', color: theme.statusGreen },
               { icon: 'check', text: 'Cameroonian acoustic profile learned automatically', color: theme.statusGreen },
-              { icon: 'check', text: 'Supports Fulfulde, French, and English speech patterns', color: theme.statusGreen },
+              { icon: 'check', text: 'Supports Cameroonian French and English speech patterns (Fulfulde planned)', color: theme.statusGreen },
             ].map((p) => (
               <View key={p.text} style={styles.problemPoint}>
                 <MaterialIcons name={p.icon as any} size={13} color={p.color} />

@@ -263,6 +263,12 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="voice-selftest"
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="self-healing-ai"
         options={{
           animation: 'slide_from_right',
