@@ -1,46 +1,104 @@
-// services/outbreakRadar.ts
-// Logs prototype session data to Supabase outbreak_radar table.
-// Called at the end of every completed 90-second scan.
+/**
+ * MediAid · services/outbreakRadar.ts
+ * AICEXPERTS Limited · MIT Licence
+ *
+ * Public entry point for logging scan events to the outbreak radar.
+ *
+ * Call logPrototypeSession() immediately after a scan completes.
+ * It builds an anonymised RadarEvent via toRadarEvent() (the de-identification
+ * gateway) and enqueues it for background upload via radarQueue.
+ *
+ * Nothing here transmits data directly — all transmission happens in
+ * radarQueue.flush() which is triggered by connectivity events, scan
+ * completions, and the "Sync now" button.
+ *
+ * Data transmitted per event (whitelisted in deidentify.ts):
+ *   village_geohash, data_source, total_scans, green_count, amber_count,
+ *   red_count, cough_positive, referral_count, fever_flag.
+ *
+ * NEVER transmitted: patient name, patient ID, GPS, raw audio/video,
+ * biometric templates, village_name, free text, GBV indicators.
+ */
 
-import { getSharedSupabaseClient } from '../template/core/client';
+import { enqueue, flush } from './radarQueue';
+import { toRadarEvent, DataSource } from './deidentify';
 
-export type SimulatedResult = 'GREEN' | 'AMBER' | 'RED';
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export type SessionType = 'co-design' | 'demo' | 'training' | 'field-test';
 
-export interface PrototypeSession {
-  villageName: string;      // 'Baligham' | 'Bagam' | 'Lab/Demo'
-  villageGeohash: string;   // 's0yg' Baligham | 's0yf' Bagam | 's000' Lab
-  simulatedResult: SimulatedResult;
-  coughFlag: boolean;       // Did the scan show a cough positive result?
+export interface LogSessionParams {
+  /** 4-char geohash of the village/site where the scan was performed. */
+  villageGeohash: string;
+
+  /**
+   * The session trust tier.
+   * co-design / demo → 'simulated_demo'
+   * training         → 'training'
+   * field-test       → 'field_test'
+   * ('field' is never sent from the app in the current build)
+   */
   sessionType: SessionType;
+
+  /** Four-colour scan outcome. */
+  outcomeColour: 'green' | 'amber' | 'red' | 'grey';
+
+  /** True if the cough segment produced a positive signal flag. */
+  coughPositive: boolean;
+
+  /** True if a referral was issued for this patient. */
+  referralIssued?: boolean;
 }
 
-export async function logPrototypeSession(params: PrototypeSession): Promise<void> {
-  const client = getSharedSupabaseClient();
+// ---------------------------------------------------------------------------
+// sessionType → DataSource mapping
+// ---------------------------------------------------------------------------
 
-  const coughRate = params.coughFlag ? 0.4 : 0;
+function resolveDataSource(sessionType: SessionType): DataSource {
+  switch (sessionType) {
+    case 'training':    return 'training';
+    case 'field-test':  return 'field_test';
+    case 'co-design':
+    case 'demo':
+    default:            return 'simulated_demo';
+  }
+}
 
-  const alertLevel =
-    params.simulatedResult === 'RED'   ? 'ELEVATED' :
-    coughRate > 0.35                   ? 'ELEVATED' : 'NORMAL';
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
-  const { error } = await client
-    .from('outbreak_radar')
-    .insert({
-      village_name:    params.villageName,
+/**
+ * Log a completed scan session to the outbreak radar queue.
+ *
+ * This function:
+ *   1. Calls toRadarEvent() to build the whitelisted anonymised event.
+ *   2. Enqueues it locally (AsyncStorage, never dropped until server confirms).
+ *   3. Attempts an immediate flush (non-blocking, never throws).
+ *
+ * Safe to call from the scan workflow with no await — it runs in the
+ * background and never delays the UI.
+ */
+export async function logPrototypeSession(params: LogSessionParams): Promise<void> {
+  try {
+    const event = toRadarEvent({
       village_geohash: params.villageGeohash,
-      total_scans:     1,
-      green_count:     params.simulatedResult === 'GREEN' ? 1 : 0,
-      amber_count:     params.simulatedResult === 'AMBER' ? 1 : 0,
-      red_count:       params.simulatedResult === 'RED'   ? 1 : 0,
-      cough_positive:  params.coughFlag ? 1 : 0,
-      fever_flag:      0,
-      referral_count:  params.simulatedResult !== 'GREEN' ? 1 : 0,
-      alert_level:     alertLevel,
+      data_source:     resolveDataSource(params.sessionType),
+      outcomeColour:   params.outcomeColour,
+      coughPositive:   params.coughPositive,
+      referralIssued:  params.referralIssued ?? false,
     });
 
-  if (error) {
-    // Fail silently — prototype session logging must never block the CHA workflow
-    console.warn('[MediAid] Outbreak radar sync failed:', error.message);
+    await enqueue(event);
+
+    // Fire-and-forget flush — does not block the caller
+    flush().catch(() => {
+      // flush() itself never throws, but we catch anyway for safety
+    });
+  } catch (err) {
+    // Never propagate errors to the scan workflow
+    console.error('[outbreakRadar] logPrototypeSession error:', err);
   }
 }

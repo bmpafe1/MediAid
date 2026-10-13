@@ -1,8 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScanResult, SyncRecord, syncHistory } from '@/services/mockData';
+import { flush } from '@/services/radarQueue';
+import NetInfo from '@react-native-community/netinfo';
 
 export type Language = 'en' | 'fr';
+
+export interface VillageSite {
+  geohash: string; // 4-char geohash
+  displayName: string;
+}
+
+// Default village/site options (Phase 1 pilot villages)
+export const VILLAGE_SITES: VillageSite[] = [
+  { geohash: 's0yg', displayName: 'Baligham' },
+  { geohash: 's0yf', displayName: 'Bagam' },
+  { geohash: 's000', displayName: 'Lab / Demo' },
+];
 
 interface AppState {
   demoMode: boolean;
@@ -24,6 +38,16 @@ interface AppState {
 
   patientName: string;
   setPatientName: (n: string) => void;
+
+  // Village / site setting — persisted across sessions
+  activeSite: VillageSite;
+  setActiveSite: (site: VillageSite) => void;
+
+  // Real radar queue stats — refreshed on demand
+  radarPendingCount: number;
+  radarLastSyncAt: string | null;
+  radarLastError: string | null;
+  refreshRadarStats: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -35,6 +59,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [syncRecords, setSyncRecords] = useState<SyncRecord[]>(syncHistory);
   const [patientName, setPatientName] = useState('');
+  const [activeSite, setActiveSiteState] = useState<VillageSite>(VILLAGE_SITES[0]);
+  const [radarPendingCount, setRadarPendingCount] = useState(0);
+  const [radarLastSyncAt, setRadarLastSyncAt] = useState<string | null>(null);
+  const [radarLastError, setRadarLastError] = useState<string | null>(null);
+
+  // Radar queue stats loader
+  const refreshRadarStats = async () => {
+    try {
+      const { pendingCount, lastSyncAt, lastError } = await import('@/services/radarQueue');
+      const [count, syncAt, err] = await Promise.all([
+        pendingCount(),
+        lastSyncAt(),
+        lastError(),
+      ]);
+      setRadarPendingCount(count);
+      setRadarLastSyncAt(syncAt);
+      setRadarLastError(err);
+    } catch {
+      // Non-fatal
+    }
+  };
 
   useEffect(() => {
     AsyncStorage.getItem('scanHistory').then((d) => {
@@ -46,6 +91,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     AsyncStorage.getItem('language').then((d) => {
       if (d) setLanguageState(d as Language);
     });
+    AsyncStorage.getItem('activeSite').then((d) => {
+      if (d) { try { setActiveSiteState(JSON.parse(d)); } catch {} }
+    });
+    // Load initial radar stats
+    refreshRadarStats();
+    // Flush queue on app start
+    flush().catch(() => {});
+    // Re-flush whenever connectivity is restored
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        flush().catch(() => {});
+        refreshRadarStats();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -67,6 +127,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateScanInHistory = (updated: ScanResult) => {
     setScanHistory((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  };
+
+  const setActiveSite = (site: VillageSite) => {
+    setActiveSiteState(site);
+    AsyncStorage.setItem('activeSite', JSON.stringify(site));
   };
 
   const addSyncRecord = (r: SyncRecord) => {
@@ -92,6 +157,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addSyncRecord,
         patientName,
         setPatientName,
+        activeSite,
+        setActiveSite,
+        radarPendingCount,
+        radarLastSyncAt,
+        radarLastError,
+        refreshRadarStats,
       }}
     >
       {children}

@@ -17,6 +17,7 @@ import { theme } from '@/constants/theme';
 import { useApp } from '@/contexts/AppContext';
 import { t } from '@/constants/i18n';
 import { generateMockScanResult, generateDemoRedResult } from '@/services/mockData';
+import { logPrototypeSession } from '@/services/outbreakRadar';
 import { Accelerometer } from 'expo-sensors';
 import { PPGWaveform } from '@/components/PPGWaveform';
 import { TremorWaveform } from '@/components/TremorWaveform';
@@ -35,7 +36,7 @@ const STEP_DURATIONS = {
 export default function ScanWorkflow() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { demoMode, setCurrentScan, addScanToHistory, language } = useApp();
+  const { demoMode, setCurrentScan, addScanToHistory, language, activeSite, refreshRadarStats } = useApp();
   const { prefillName } = useLocalSearchParams<{ prefillName?: string }>();
 
   const speak = useCallback((text: string) => {
@@ -153,6 +154,29 @@ export default function ScanWorkflow() {
                   : generateMockScanResult(patientName || 'Unknown Patient');
                 setCurrentScan(result);
                 addScanToHistory(result);
+
+                // --- Radar event: fire-and-forget, never blocks UI ---
+                // Derive 4-colour outcome from scan metrics
+                const { getStatusForMetric } = await import('@/services/mockData');
+                const hasYellow =
+                  getStatusForMetric('tbRisk', result.tbRisk) === 'yellow' ||
+                  getStatusForMetric('afibRisk', result.afibRisk) === 'yellow' ||
+                  getStatusForMetric('heartRate', result.heartRate) === 'yellow' ||
+                  getStatusForMetric('hemoglobin', result.hemoglobin) === 'yellow' ||
+                  getStatusForMetric('spo2', result.spo2) === 'yellow' ||
+                  getStatusForMetric('respiratoryRate', result.respiratoryRate) === 'yellow' ||
+                  getStatusForMetric('tremorRisk', result.tremorRisk) === 'yellow';
+                const outcomeColour: 'green' | 'amber' | 'red' | 'grey' =
+                  result.hasRedAlert ? 'red' : hasYellow ? 'amber' : 'green';
+                logPrototypeSession({
+                  villageGeohash: activeSite.geohash,
+                  sessionType:    demoMode ? 'demo' : 'field-test',
+                  outcomeColour,
+                  coughPositive:  (result.tbRisk ?? 0) >= 50,
+                  referralIssued: result.hasRedAlert || result.overallStatus === 'YELLOW',
+                }).then(() => refreshRadarStats()).catch(() => {});
+                // -------------------------------------------------------
+
                 router.replace('/results');
                 if (result.hasRedAlert) {
                   setTimeout(() => {
