@@ -108,12 +108,13 @@ function buildReportText(
       '',
     ].join('\n')),
     reds.length === 0 ? 'No RED alerts today. All patients stable.\n' : '',
-    '━━━━━━━━━━━ DATA SECURITY ━━━━━━━━━━━━━━━',
+    '━━━━━━━━━━━ DATA HANDLING ━━━━━━━━━━━━━━━',
     '',
-    '✓ AES-256 encryption applied',
-    '✓ Patient names anonymized for DHIS2 sync',
-    '✓ FHIR R4 bundle format',
     '✓ Oral consent logged for all patients',
+    '✓ Only aggregate counts leave the device',
+    '✓ Patient names NOT included in radar sync',
+    '! Encrypted local store: planned (not yet active)',
+    '! FHIR R4 bundle sync: planned Q2 (not yet active)',
     '',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     'MediAid v1.0 · UNICEF Venture Fund Prototype',
@@ -432,7 +433,7 @@ export default function DailyReportScreen() {
               <MaterialIcons name={exporting ? 'hourglass-empty' : 'share'} size={24} color="#FFF" />
               <View>
                 <Text style={styles.bigExportTitle}>{exporting ? 'Preparing Report...' : 'Share Daily Report'}</Text>
-                <Text style={styles.bigExportSub}>Export full TXT report · All {todayScans.length} patients · FHIR R4 compliant</Text>
+                <Text style={styles.bigExportSub}>Export full TXT report · All {todayScans.length} patients · FHIR-style format (draft)</Text>
               </View>
             </Pressable>
           </>

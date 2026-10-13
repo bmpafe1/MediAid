@@ -1,6 +1,8 @@
 // MediAid — Silent LLM Validation Track (v10)
-// Borderline consultation records evaluated against GPT-4o, Gemini, Claude in African clinical context
-// This is a PARALLEL validation track only — never shown to CHA or patient during consultation
+// NOTE: This screen shows simulated GPT-4o/Gemini/Claude evaluations.
+// It is a vision/research module — NOT part of the funded UNICEF scope.
+// Hidden from navigation when VISION_MODULES = false (default).
+import { isVisionEnabled } from '@/constants/featureFlags';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
@@ -436,6 +438,30 @@ function RecordCard({ record }: { record: ConsultationRecord }) {
 export default function LLMValidationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  // Block access when vision modules are disabled (UNICEF demo build)
+  if (!isVisionEnabled()) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.navbar}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={22} color={theme.textPrimary} />
+          </Pressable>
+          <Text style={styles.navTitle}>Not Available</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <MaterialIcons name="block" size={56} color={theme.textMuted} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textPrimary, marginTop: 16, textAlign: 'center' }}>
+            Vision Module
+          </Text>
+          <Text style={{ fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 }}>
+            The LLM Validation track is a research vision module and is not included in the funded UNICEF scope.{' '}
+            It is hidden in the current build (VISION_MODULES=false).
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const totalEvaluated = RECORDS.filter((r) => r.syncStatus === 'evaluated').length;
   const fullAgreement = RECORDS.filter((r) => r.agreedCount === 3).length;

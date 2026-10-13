@@ -146,7 +146,7 @@ async function exportReport(scan: ScanResult) {
     '[8] WHO HeAR — TB cough classification — arxiv.org/abs/2403.02522',
     '',
     '--- PRIVACY ---',
-    'Generated on-device · AES-256 encrypted at rest · FHIR R4 compliant',
+    'Generated on-device · FHIR-style export (draft) · Literature values cited separately',
     `Report generated: ${new Date().toISOString()}`,
     '=== END REPORT ===',
   ];
@@ -429,7 +429,7 @@ export default function ResultsScreen() {
         <View style={styles.v10Banner}>
           <MaterialIcons name="science" size={14} color={theme.primary} />
           <Text style={styles.v10BannerText}>
-            MediAid v10 · 25+ peer-reviewed studies · 16 validated sensor capabilities · African AI Equity Protocol active
+            MediAid v10 · 15+ peer-reviewed citations · Outputs: Simulated (on-device inference planned) · African AI Equity Protocol active
           </Text>
         </View>
 

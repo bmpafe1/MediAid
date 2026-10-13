@@ -161,7 +161,7 @@ const en: Translations = {
   partE_label: 'Eye Screening',
 
   processing_title: 'Analysing Results',
-  processing_sub: 'On-device AI inference · TensorFlow Lite · No data transmitted',
+  processing_sub: 'Simulated analysis · On-device inference planned (TFLite) · No patient data transmitted',
   processing_facial: 'Facial PPG analysis',
   processing_cough: 'Cough classification',
   processing_spo2: 'SpO₂ / RR calculation',
@@ -271,7 +271,7 @@ const fr: Translations = {
   partE_label: 'Dépistage Oculaire',
 
   processing_title: 'Analyse en cours...',
-  processing_sub: 'Inférence IA sur appareil · TensorFlow Lite · Aucune donnée transmise',
+  processing_sub: 'Analyse simulée · Inférence embarquée planifiée (TFLite) · Aucune donnée patient transmise',
   processing_facial: 'Analyse PPG faciale',
   processing_cough: 'Classification de la toux',
   processing_spo2: 'Calcul SpO₂ / FR',

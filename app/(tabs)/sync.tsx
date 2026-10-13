@@ -484,7 +484,7 @@ export default function SyncScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.historyDate}>{new Date(record.timestamp).toLocaleString()}</Text>
                   <Text style={styles.historyMeta}>
-                    {record.recordsSynced} events · AES-256 · {record.status.toUpperCase()}
+                    {record.recordsSynced} events · {record.status.toUpperCase()}
                   </Text>
                 </View>
                 <Text style={[styles.historyStatus, { color }]}>#{i + 1}</Text>

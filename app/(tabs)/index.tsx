@@ -18,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { theme } from '@/constants/theme';
 import { useApp } from '@/contexts/AppContext';
 import { t } from '@/constants/i18n';
+import { VISION_MODULES } from '@/constants/featureFlags';
 import { ScanResult, generateDemoRedResult } from '@/services/mockData';
 import { ConnectivityBanner } from '@/components/ConnectivityBanner';
 

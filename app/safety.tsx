@@ -1,4 +1,5 @@
 // Powered by OnSpace.AI — Feature 2: Non-Bypassable Safety Screen
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -74,11 +75,33 @@ export default function SafetyScreen() {
     setBypassConfirming(true);
   };
 
-  const handleBypassConfirm = () => {
+  const handleBypassConfirm = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    // Mock SMS escalation (per spec — print to console)
-    console.log('[SMS SENT TO SUPERVISOR] ⚠️ BYPASS TRIGGERED. Patient: ' + (currentScan?.patientName ?? 'Unknown') + ' · Timestamp: ' + new Date().toISOString() + ' · CHA did not escort patient with RED alert.');
-    alert('[MOCK] SMS SENT TO SUPERVISOR:\nCHA bypassed RED alert for ' + (currentScan?.patientName ?? 'Unknown Patient'));
+
+    // Build a persistent escalation record in AsyncStorage.
+    // We do NOT claim an SMS was sent — no SMS gateway is configured.
+    const escalation = {
+      id: `esc_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      patientId: currentScan?.patientId ?? 'unknown',
+      patientName: currentScan?.patientName ?? 'Unknown Patient',
+      reason: 'CHA override',
+      bypassLogged: true,
+      supervisorAlertRequired: true,
+      smsStatus: 'not_sent_no_gateway',
+      note: 'Escalation recorded. SMS not yet sent: no SMS gateway configured.',
+    };
+    try {
+      const raw = await AsyncStorage.getItem('escalations_v1');
+      const list = raw ? JSON.parse(raw) : [];
+      list.unshift(escalation);
+      await AsyncStorage.setItem('escalations_v1', JSON.stringify(list.slice(0, 200)));
+    } catch (e) {
+      console.error('[SafetyScreen] Failed to persist escalation record:', e);
+    }
+
+    // Surface an honest notice to the CHA
+    alert('Escalation recorded.\n\nSMS not yet sent: no SMS gateway is configured.\nSupervisor will be notified on next sync.');
 
     if (currentScan) {
       updateScanInHistory({ ...currentScan, bypassLogged: true, bypassReason: 'CHA override' });

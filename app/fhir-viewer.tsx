@@ -106,7 +106,7 @@ function buildObservation(
       subject: { reference: `Patient/${scan.patientId}` },
       effectiveDateTime: scan.scanTimestamp,
       valueQuantity: { value, unit, system: 'http://unitsofmeasure.org', code: unit },
-      method: { text: 'On-device AI inference — MediAid v1.0 (TensorFlow Lite)' },
+      method: { text: 'Simulated analysis — MediAid v1.0 (on-device inference planned for Phase 1)' },
     },
   };
 }
@@ -302,8 +302,8 @@ export default function FHIRViewerScreen() {
           <Text style={styles.infoBadgeText}>FHIR R4 Compliant</Text>
         </View>
         <View style={styles.infoBadge}>
-          <MaterialIcons name="lock" size={12} color={theme.primary} />
-          <Text style={styles.infoBadgeText}>AES-256 Encrypted</Text>
+          <MaterialIcons name="lock" size={12} color={theme.textMuted} />
+          <Text style={styles.infoBadgeText}>Encrypted store (planned)</Text>
         </View>
         <View style={styles.infoBadge}>
           <MaterialIcons name="smartphone" size={12} color={theme.statusYellow} />
@@ -375,7 +375,7 @@ export default function FHIRViewerScreen() {
           <MaterialIcons name="info-outline" size={14} color={theme.textMuted} />
           <Text style={styles.refNoteText}>
             Generated per HL7 FHIR R4 spec · Compatible with DHIS2 FHIR facade and OpenHIE workflows.
-            All values are AI-simulated within clinically plausible ranges for prototype demonstration.
+            All values are AI-simulated within clinically plausible ranges. FHIR-style export (draft) — not yet validated against a FHIR validator. Literature citation values are from the cited publications, not from MediAid field results.
           </Text>
         </View>
       </ScrollView>

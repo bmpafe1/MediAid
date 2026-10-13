@@ -727,7 +727,7 @@ export default function ScanWorkflow() {
           </Animated.View>
           <Text style={styles.processingTitle}>Analysing Results</Text>
           <Text style={styles.processingSubtitle}>
-            Running model registry · 5 modules · All simulated · No data transmitted
+            Running simulated model registry · 5 modules · All outputs simulated · No patient data transmitted
           </Text>
           <View style={styles.processingChecks}>
             {[

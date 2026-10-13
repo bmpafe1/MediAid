@@ -1,6 +1,7 @@
 // Powered by OnSpace.AI
 import { AppProvider } from '@/contexts/AppContext';
-import { Stack, useRouter } from 'expo-router';
+import { VISION_MODULES, isVisionOnlyRoute } from '@/constants/featureFlags';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';

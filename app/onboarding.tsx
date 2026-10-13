@@ -99,7 +99,7 @@ function LanguageSlide({
           >
             <Text style={langStyles.flag}>🇫🇷</Text>
             <Text style={[langStyles.langName, selectedLang === 'fr' && { color: theme.primary }]}>
-              Français
+              {'\u0046ran\u00e7ais'}
             </Text>
             <Text style={[langStyles.langSub, selectedLang === 'fr' && { color: theme.primary + 'AA' }]}>
               French
@@ -116,7 +116,8 @@ function LanguageSlide({
       <View style={langStyles.noticeRow}>
         <MaterialIcons name="language" size={14} color={theme.textMuted} />
         <Text style={langStyles.noticeText}>
-          You can change this later in Settings · Vous pouvez changer cela dans Paramètres
+          {/* Avoiding apostrophes via unicode */}
+          {'You can change this later in Settings \u00b7 Vous pouvez changer cela dans Param\u00e8tres'}
         </Text>
       </View>
     </View>
@@ -207,6 +208,11 @@ interface Slide {
   icon: string;
 }
 
+// NOTE: All accuracy figures below are literature values from published studies.
+// They describe the AI capabilities MediAid is designed to integrate.
+// MediAid does NOT claim these figures from its own testing.
+// Current scan outputs are SIMULATED (not derived from real sensor inference).
+
 const SLIDES_EN: Slide[] = [
   {
     id: '1',
@@ -214,30 +220,30 @@ const SLIDES_EN: Slide[] = [
     eyebrow: 'UNICEF Venture Fund · Cameroon',
     title: 'Screen 5 Diseases\nin 90 Seconds',
     subtitle:
-      'Community Health Aides in rural Cameroon can now run a full multi-condition screening — no lab, no doctor, no internet required.',
-    highlight: 'TB · AFib · Anemia · Parkinson\'s · Eye Disease',
+      'Community Health Aides in rural Cameroon can run a full multi-condition screening — no lab, no doctor, no internet required. Clinical outputs are currently simulated; on-device AI inference is planned for Phase 1.',
+    highlight: 'TB · AFib · Anemia · Tremor · Eye Disease',
     highlightColor: theme.primary,
     icon: 'health-and-safety',
   },
   {
     id: '2',
     image: require('@/assets/images/scan-complete.png'),
-    eyebrow: 'On-Device AI · TensorFlow Lite',
-    title: 'Powered by\nPeer-Reviewed AI',
+    eyebrow: 'Peer-Reviewed AI Algorithms (Outputs: Simulated)',
+    title: 'Grounded in\nPeer-Reviewed Science',
     subtitle:
-      'Every algorithm is validated in published research. Facial PPG for AFib (95% sensitivity), HeAR for TB cough (94% accuracy), and more.',
-    highlight: '15 peer-reviewed citations · AUC 0.89–0.97',
+      'Each algorithm targets capabilities validated in published research. Facial PPG for AFib (95% sensitivity — Yan et al. 2018), HeAR cough model for TB (94% accuracy — Yellapu et al. 2023). All figures are literature values, not MediAid results.',
+    highlight: '15+ peer-reviewed citations · Literature values, not MediAid results',
     highlightColor: theme.statusGreen,
     icon: 'science',
   },
   {
     id: '3',
     image: require('@/assets/images/radar-map.png'),
-    eyebrow: 'Climate × Health Intelligence',
+    eyebrow: 'Climate x Health Intelligence',
     title: 'Predict Outbreaks\nBefore They Spread',
     subtitle:
-      'The District Radar links rainfall anomalies to disease surges (Bime et al. 2022). CHAs see Malaria risk 4–6 weeks ahead.',
-    highlight: 'DHIS2 · FHIR R4 · Offline-first · AES-256',
+      'The District Radar links rainfall anomalies to disease surges (Bime et al. 2022). CHAs see Malaria risk 4-6 weeks ahead. Radar sync is live; DHIS2 and FHIR R4 sync are planned for Q2.',
+    highlight: 'DHIS2 (planned) · FHIR-style export (draft) · Offline-first',
     highlightColor: theme.statusYellow,
     icon: 'radar',
   },
@@ -248,32 +254,32 @@ const SLIDES_FR: Slide[] = [
     id: '1',
     image: require('@/assets/images/scan-hero.png'),
     eyebrow: 'Fonds Venture UNICEF · Cameroun',
-    title: 'Dépister 5 Maladies\nen 90 Secondes',
+    title: 'Depister 5 Maladies\nen 90 Secondes',
     subtitle:
-      "Les Agents de Santé Communautaires au Cameroun rural peuvent désormais effectuer un dépistage complet — sans laboratoire, sans médecin, sans internet.",
-    highlight: 'TB · FAtriale · Anémie · Parkinson · Maladies Oculaires',
+      "Les Agents de Sante Communautaires au Cameroun rural peuvent effectuer un depistage complet sans laboratoire, sans medecin, sans internet. Les sorties cliniques sont actuellement simulees; l'inference IA embarquee est prevue pour la Phase 1.",
+    highlight: 'TB · FA · Anemie · Tremblements · Maladies Oculaires',
     highlightColor: theme.primary,
     icon: 'health-and-safety',
   },
   {
     id: '2',
     image: require('@/assets/images/scan-complete.png'),
-    eyebrow: 'IA Embarquée · TensorFlow Lite',
-    title: 'Alimenté par une\nIA Évaluée par les Pairs',
+    eyebrow: 'Algorithmes valides par les pairs (Sorties : Simulees)',
+    title: 'Fonde sur la\nScience Publiee',
     subtitle:
-      "Chaque algorithme est validé par des recherches publiées. PPG facial pour la FA (95% sensibilité), HeAR pour la tuberculose (94% précision).",
-    highlight: '15 citations évaluées par les pairs · AUC 0,89–0,97',
+      "Chaque algorithme cible des capacites validees par des recherches publiees. PPG facial pour la FA (95% sensibilite - Yan et al. 2018), modele HeAR pour la tuberculose (94% precision - Yellapu et al. 2023). Toutes les valeurs proviennent de la litterature, pas de resultats MediAid.",
+    highlight: '15+ citations evaluees par les pairs · Valeurs issues de la litterature',
     highlightColor: theme.statusGreen,
     icon: 'science',
   },
   {
     id: '3',
     image: require('@/assets/images/radar-map.png'),
-    eyebrow: 'Intelligence Climatique × Santé',
-    title: "Prédire les Épidémies\nAvant qu'Elles ne Se Propagent",
+    eyebrow: 'Intelligence Climatique x Sante',
+    title: "Predire les Epidemies\nAvant qu'Elles ne Se Propagent",
     subtitle:
-      "Le Radar de District relie les anomalies pluviométriques aux pics de maladies (Bime et al. 2022). Les ASC voient le risque de paludisme 4–6 semaines à l'avance.",
-    highlight: 'DHIS2 · FHIR R4 · Hors ligne · AES-256',
+      "Le Radar de District relie les anomalies pluviometriques aux pics de maladies (Bime et al. 2022). La synchronisation Radar est active; DHIS2 et FHIR R4 sont prevus pour le Q2.",
+    highlight: 'DHIS2 (prevu) · Export FHIR (brouillon) · Hors ligne',
     highlightColor: theme.statusYellow,
     icon: 'radar',
   },
@@ -389,7 +395,7 @@ export default function OnboardingScreen() {
           ) : (
             <>
               <MaterialIcons name="health-and-safety" size={20} color="#FFF" />
-              <Text style={styles.nextBtnText}>{selectedLang === 'fr' ? 'Démarrer MediAid' : 'Start MediAid'}</Text>
+              <Text style={styles.nextBtnText}>{selectedLang === 'fr' ? 'Demarrer MediAid' : 'Start MediAid'}</Text>
             </>
           )}
         </Pressable>
