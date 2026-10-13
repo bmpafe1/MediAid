@@ -1,0 +1,110 @@
+{
+  "_comment": "MediAid Model Registry — bundled defaults. AICEXPERTS Limited · MIT Licence.",
+  "_schema": "v1",
+  "modules": [
+    {
+      "id": "tb_cough",
+      "name": "TB Cough Acoustic Classifier",
+      "version": "0.1.0",
+      "status": "simulated",
+      "runtime": "simulated",
+      "funded": true,
+      "modelCardUrl": "https://arxiv.org/abs/2403.02522",
+      "input": {
+        "kind": "audio",
+        "sampleRateHz": 16000,
+        "durationSec": 20,
+        "channels": 1
+      },
+      "output": {
+        "fields": [
+          { "key": "tbRisk",    "type": "number", "unit": "%",  "min": 0, "max": 100 },
+          { "key": "coughPositive", "type": "boolean" }
+        ]
+      }
+    },
+    {
+      "id": "anaemia",
+      "name": "Conjunctival Anaemia Detector",
+      "version": "0.1.0",
+      "status": "simulated",
+      "runtime": "simulated",
+      "funded": true,
+      "modelCardUrl": "https://doi.org/10.1016/j.eclinm.2025.100000",
+      "input": {
+        "kind": "image",
+        "shape": [224, 224, 3]
+      },
+      "output": {
+        "fields": [
+          { "key": "hemoglobin", "type": "number", "unit": "g/dL", "min": 3, "max": 20 }
+        ]
+      }
+    },
+    {
+      "id": "bioacoustic",
+      "name": "Bioacoustic Vitals Analyser",
+      "version": "0.1.0",
+      "status": "simulated",
+      "runtime": "simulated",
+      "funded": true,
+      "modelCardUrl": "https://arxiv.org/abs/2403.02522",
+      "input": {
+        "kind": "audio",
+        "sampleRateHz": 16000,
+        "durationSec": 20,
+        "channels": 1
+      },
+      "output": {
+        "fields": [
+          { "key": "heartRate",        "type": "number", "unit": "BPM",       "min": 30,  "max": 220 },
+          { "key": "spo2",             "type": "number", "unit": "%",         "min": 50,  "max": 100 },
+          { "key": "respiratoryRate",  "type": "number", "unit": "breaths/min","min": 4,  "max": 60  },
+          { "key": "afibRisk",         "type": "number", "unit": "%",         "min": 0,   "max": 100 },
+          { "key": "covidFlag",        "type": "boolean" }
+        ]
+      }
+    },
+    {
+      "id": "jaundice",
+      "name": "Scleral Jaundice Colorimetry",
+      "version": "0.0.1",
+      "status": "investigational",
+      "runtime": "simulated",
+      "funded": false,
+      "modelCardUrl": "https://doi.org/10.1371/journal.pone.0290279",
+      "input": {
+        "kind": "image",
+        "shape": [224, 224, 3]
+      },
+      "output": {
+        "fields": [
+          { "key": "jaundiceFlag", "type": "boolean" }
+        ]
+      }
+    },
+    {
+      "id": "cardiac_ppg",
+      "name": "Cardiac PPG Risk Suite",
+      "version": "0.0.1",
+      "status": "investigational",
+      "runtime": "simulated",
+      "funded": false,
+      "modelCardUrl": "https://doi.org/10.1038/s41746-024-01103-z",
+      "input": {
+        "kind": "video",
+        "sampleRateHz": 30,
+        "durationSec": 20,
+        "channels": 3
+      },
+      "output": {
+        "fields": [
+          { "key": "tremorRisk",   "type": "number", "unit": "%", "min": 0, "max": 100 },
+          { "key": "cvdRisk10yr",  "type": "number", "unit": "%", "min": 0, "max": 100 },
+          { "key": "glucoseFlag",  "type": "boolean" },
+          { "key": "eyeConditions","type": "number", "unit": "count", "min": 0, "max": 7 }
+        ]
+      }
+    }
+  ]
+}

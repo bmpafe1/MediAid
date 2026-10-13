@@ -274,6 +274,12 @@ function RootNavigator() {
           animation: 'slide_from_right',
         }}
       />
+      <Stack.Screen
+        name="models"
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
     </Stack>
   );
 }

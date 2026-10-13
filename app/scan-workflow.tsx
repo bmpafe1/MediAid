@@ -15,7 +15,10 @@
 //
 // WHAT IS SIMULATED (labelled on every result card):
 //   - TB cough classification, AFib, Hemoglobin, SpO₂, Eye conditions, etc.
-//     These are randomly sampled within published sensitivity/specificity ranges.
+//   - These come from the Model Registry (services/modelRegistry.ts).
+//     Each module returns its own status label: "Simulated model v0.1.0".
+//   - INVESTIGATIONAL modules (jaundice, cardiac_ppg) are EXCLUDED from
+//     the referral colour/hasRedAlert logic — enforced in computeHasRedAlert().
 //
 import { MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
@@ -36,7 +39,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { theme } from '@/constants/theme';
 import { useApp } from '@/contexts/AppContext';
 import { t } from '@/constants/i18n';
-import { generateMockScanResult, generateDemoRedResult, getStatusForMetric } from '@/services/mockData';
+import { config } from '@/constants/config';
+import { generateDemoRedResult } from '@/services/mockData';
+import { getStatusForMetric } from '@/services/mockData';
+import type { ScanResult } from '@/services/mockData';
 import { logPrototypeSession } from '@/services/outbreakRadar';
 import { Accelerometer } from 'expo-sensors';
 import { PPGWaveform } from '@/components/PPGWaveform';
@@ -53,6 +59,11 @@ import {
   type RecognitionState,
   type VoiceCommandSession,
 } from '@/services/voiceCommands';
+import {
+  run as registryRun,
+  type ModuleOutput,
+} from '@/services/modelRegistry';
+import { runDemoSimulatedModule } from '@/services/providers/simulatedProvider';
 
 type WorkflowStep = 'consent' | 'partA' | 'partB' | 'partC' | 'partD' | 'partE' | 'processing';
 
@@ -63,6 +74,73 @@ const STEP_DURATIONS = {
   partD: 15,
   partE: 15,
 };
+
+const ALL_MODULE_IDS = ['tb_cough', 'anaemia', 'bioacoustic', 'jaundice', 'cardiac_ppg'];
+
+// ── Referral guard ─────────────────────────────────────────────────────────────
+// Only outputs from modules where affectsReferral === true contribute to RED.
+// INVESTIGATIONAL modules NEVER appear here.
+function computeHasRedAlert(outputs: ModuleOutput[]): boolean {
+  const relevant = outputs.filter((o) => o.affectsReferral);
+  const t = config.thresholds;
+  for (const output of relevant) {
+    const f = output.fields;
+    const tbRisk        = f['tbRisk']        as number | undefined;
+    const afibRisk      = f['afibRisk']      as number | undefined;
+    const heartRate     = f['heartRate']      as number | undefined;
+    const hemoglobin    = f['hemoglobin']     as number | undefined;
+    const spo2          = f['spo2']           as number | undefined;
+    const respiratoryRate = f['respiratoryRate'] as number | undefined;
+    const tremorRisk    = f['tremorRisk']     as number | undefined;
+
+    if (tbRisk       !== undefined && tbRisk          >= t.tbRisk.red)          return true;
+    if (afibRisk     !== undefined && afibRisk         >= t.afibRisk.red)        return true;
+    if (heartRate    !== undefined && (heartRate <= t.heartRate.redLow || heartRate >= t.heartRate.redHigh)) return true;
+    if (hemoglobin   !== undefined && hemoglobin       <= t.hemoglobin.red)      return true;
+    if (spo2         !== undefined && spo2             <= t.spo2.red)            return true;
+    if (respiratoryRate !== undefined && (respiratoryRate >= t.respiratoryRate.redHigh || respiratoryRate <= t.respiratoryRate.redLow)) return true;
+    if (tremorRisk   !== undefined && tremorRisk       >= 60)                    return true;
+  }
+  return false;
+}
+
+// ── Build ScanResult from module outputs ──────────────────────────────────────
+function buildScanResult(
+  patientName: string,
+  outputs: ModuleOutput[],
+  moduleVersions: Record<string, string>,
+): ScanResult {
+  const fields: Record<string, unknown> = {};
+  for (const o of outputs) {
+    Object.assign(fields, o.fields);
+  }
+  const hasRedAlert = computeHasRedAlert(outputs);
+
+  return {
+    id: `scan_${Date.now()}`,
+    patientName: patientName || 'Unknown Patient',
+    patientId: `CHA-${Math.floor(Math.random() * 9000 + 1000)}`,
+    consentTimestamp: new Date().toISOString(),
+    scanTimestamp: new Date().toISOString(),
+    tbRisk:          (fields['tbRisk']          as number)  ?? 0,
+    afibRisk:        (fields['afibRisk']        as number)  ?? 0,
+    heartRate:       (fields['heartRate']        as number)  ?? 60,
+    hemoglobin:      (fields['hemoglobin']       as number)  ?? 12,
+    spo2:            (fields['spo2']             as number)  ?? 98,
+    respiratoryRate: (fields['respiratoryRate']  as number)  ?? 16,
+    tremorRisk:      (fields['tremorRisk']       as number)  ?? 0,
+    eyeConditions:   (fields['eyeConditions']    as number)  ?? 0,
+    cvdRisk10yr:     (fields['cvdRisk10yr']      as number)  ?? 0,
+    glucoseFlag:     (fields['glucoseFlag']       as boolean) ?? false,
+    covidFlag:       (fields['covidFlag']         as boolean) ?? false,
+    jaundiceFlag:    (fields['jaundiceFlag']      as boolean) ?? false,
+    hasRedAlert,
+    bypassLogged: false,
+    synced: false,
+    // Registry metadata for results screen
+    moduleVersions,
+  } as ScanResult & { moduleVersions: Record<string, string> };
+}
 
 export default function ScanWorkflow() {
   const insets = useSafeAreaInsets();
@@ -138,12 +216,9 @@ export default function ScanWorkflow() {
       ])
     ).start();
     return () => pulseAnim.stopAnimation();
-  }, [pulseAnim]); // Added pulseAnim to dependency array
+  }, [pulseAnim]);
 
   // ── Voice commands on consent step (TASK C) ───────────────────────────────
-  // Starts listening when step === 'consent'; stops when we leave.
-  // In Expo Go isVoiceCommandAvailable() returns false → no-op.
-  // Voice commands are CONVENIENCE ONLY — buttons always work.
   useEffect(() => {
     if (step !== 'consent') {
       vcSessionRef.current?.stop();
@@ -174,7 +249,7 @@ export default function ScanWorkflow() {
       vcSessionRef.current?.stop();
       vcSessionRef.current = null;
     };
-  }, [step, language]); // Added handleConsent to dependency array
+  }, [step, language]);
 
   // ── Timer helper ───────────────────────────────────────────────────────────
   const startTimer = (duration: number, onComplete: () => void) => {
@@ -242,7 +317,6 @@ export default function ScanWorkflow() {
     if (!rec) return;
     try {
       await rec.stopAndUnloadAsync();
-      // URI deliberately not stored — audio deleted by OS on next temp clean
     } catch { /* non-fatal */ }
   }, []);
 
@@ -281,6 +355,50 @@ export default function ScanWorkflow() {
     afterRetryDecision.current?.();
     afterRetryDecision.current = null;
   }, []);
+
+  // ── Run all modules via registry ───────────────────────────────────────────
+  const runAllModules = useCallback(async (): Promise<{
+    outputs: ModuleOutput[];
+    moduleVersions: Record<string, string>;
+  }> => {
+    if (demoMode) {
+      // Demo mode: use fixed demo values, still routed through registry structure
+      const demoOutputs: ModuleOutput[] = ALL_MODULE_IDS.map((id) => ({
+        moduleId: id,
+        version: '0.1.0',
+        status: (id === 'jaundice' || id === 'cardiac_ppg') ? 'investigational' : 'simulated',
+        affectsReferral: id !== 'jaundice' && id !== 'cardiac_ppg',
+        fields: runDemoSimulatedModule(id),
+      }));
+      const versions: Record<string, string> = {};
+      for (const o of demoOutputs) versions[o.moduleId] = o.version;
+      return { outputs: demoOutputs, moduleVersions: versions };
+    }
+
+    const outputs: ModuleOutput[] = [];
+    const versions: Record<string, string> = {};
+    await Promise.all(
+      ALL_MODULE_IDS.map(async (id) => {
+        try {
+          const output = await registryRun(id, {});
+          outputs.push(output);
+          versions[id] = output.version;
+        } catch (err) {
+          console.warn(`[ScanWorkflow] registry.run("${id}") failed:`, err);
+          // Produce a safe fallback output (grey adjunct, does not affect referral)
+          outputs.push({
+            moduleId: id,
+            version: '0.0.0',
+            status: 'simulated',
+            affectsReferral: false,
+            fields: {},
+          });
+        }
+      })
+    );
+    for (const o of outputs) versions[o.moduleId] = o.version;
+    return { outputs, moduleVersions: versions };
+  }, [demoMode]);
 
   // ── Consent handler ────────────────────────────────────────────────────────
   const handleConsent = useCallback(async (agreed: boolean) => {
@@ -321,42 +439,51 @@ export default function ScanWorkflow() {
             Haptics.selectionAsync();
             setStep('partE');
             speak(t('tts_partE_prompt', language));
-            startTimer(STEP_DURATIONS.partE, () => {
+            startTimer(STEP_DURATIONS.partE, async () => {
               setStep('processing');
               speak(t('tts_processing', language));
-              setTimeout(() => {
-                const result = demoMode
-                  ? generateDemoRedResult(patientName || 'Demo Patient')
-                  : generateMockScanResult(patientName || 'Unknown Patient');
-                setCurrentScan(result);
-                addScanToHistory(result);
 
-                const hasYellow =
-                  getStatusForMetric('tbRisk', result.tbRisk) === 'yellow' ||
-                  getStatusForMetric('afibRisk', result.afibRisk) === 'yellow' ||
-                  getStatusForMetric('heartRate', result.heartRate) === 'yellow' ||
-                  getStatusForMetric('hemoglobin', result.hemoglobin) === 'yellow' ||
-                  getStatusForMetric('spo2', result.spo2) === 'yellow' ||
-                  getStatusForMetric('respiratoryRate', result.respiratoryRate) === 'yellow' ||
-                  getStatusForMetric('tremorRisk', result.tremorRisk) === 'yellow';
-                const outcomeColour: 'green' | 'amber' | 'red' | 'grey' =
-                  result.hasRedAlert ? 'red' : hasYellow ? 'amber' : 'green';
-                logPrototypeSession({
-                  villageGeohash: activeSite.geohash,
-                  sessionType: demoMode ? 'demo' : 'field-test',
-                  outcomeColour,
-                  coughPositive: (result.tbRisk ?? 0) >= 50,
-                  referralIssued: result.hasRedAlert,
-                }).then(() => refreshRadarStats()).catch(() => { });
+              const delay = demoMode ? 1000 : 2000;
+              await new Promise((res) => setTimeout(res, delay));
 
-                router.replace('/results');
-                if (result.hasRedAlert) {
-                  setTimeout(() => {
-                    speak(t('tts_red_alert', language));
-                    router.push('/safety');
-                  }, 300);
-                }
-              }, demoMode ? 1000 : 2000);
+              // ── Run all modules via registry (PROMPT 7) ──────────────────
+              const { outputs, moduleVersions } = await runAllModules();
+
+              const result = demoMode
+                ? { ...generateDemoRedResult(patientName || 'Demo Patient'), moduleVersions }
+                : buildScanResult(patientName || 'Unknown Patient', outputs, moduleVersions);
+
+              setCurrentScan(result as ScanResult);
+              addScanToHistory(result as ScanResult);
+
+              // Derive outcomeColour from registry outputs (NOT from hasRedAlert alone)
+              const hasYellow =
+                getStatusForMetric('tbRisk', result.tbRisk) === 'yellow' ||
+                getStatusForMetric('afibRisk', result.afibRisk) === 'yellow' ||
+                getStatusForMetric('heartRate', result.heartRate) === 'yellow' ||
+                getStatusForMetric('hemoglobin', result.hemoglobin) === 'yellow' ||
+                getStatusForMetric('spo2', result.spo2) === 'yellow' ||
+                getStatusForMetric('respiratoryRate', result.respiratoryRate) === 'yellow' ||
+                getStatusForMetric('tremorRisk', result.tremorRisk) === 'yellow';
+
+              const outcomeColour: 'green' | 'amber' | 'red' | 'grey' =
+                result.hasRedAlert ? 'red' : hasYellow ? 'amber' : 'green';
+
+              logPrototypeSession({
+                villageGeohash: activeSite.geohash,
+                sessionType: demoMode ? 'demo' : 'field-test',
+                outcomeColour,
+                coughPositive: (result.tbRisk ?? 0) >= 50,
+                referralIssued: result.hasRedAlert,
+              }).then(() => refreshRadarStats()).catch(() => {});
+
+              router.replace('/results');
+              if (result.hasRedAlert) {
+                setTimeout(() => {
+                  speak(t('tts_red_alert', language));
+                  router.push('/safety');
+                }, 300);
+              }
             });
           });
         });
@@ -364,18 +491,18 @@ export default function ScanWorkflow() {
 
       startTimer(STEP_DURATIONS.partB, () => onPartBDone(advanceToPartC));
     });
-  }, [demoMode, language, speak, router, startCoughRecording, onPartBDone, patientName, setCurrentScan, addScanToHistory, activeSite, refreshRadarStats]); // Added all necessary dependencies
+  }, [demoMode, language, speak, router, startCoughRecording, onPartBDone, patientName, setCurrentScan, addScanToHistory, activeSite, refreshRadarStats, runAllModules]);
 
   useEffect(() => {
     speak(t('tts_consent_prompt', language));
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      clearInterval(meterTimerRef.current!); // meterTimerRef.current can be null if not started
+      clearInterval(meterTimerRef.current!);
       stopCoughRecording();
       vcSessionRef.current?.stop();
       Speech.stop();
     };
-  }, [language, speak, stopCoughRecording]); // Added stopCoughRecording to dependency array
+  }, [language, speak, stopCoughRecording]);
 
   // ── Retry overlay ──────────────────────────────────────────────────────────
   if (retryPromptVisible) {
@@ -392,7 +519,7 @@ export default function ScanWorkflow() {
               Would you like to try the cough segment again?
             </Text>
             <Text style={styles.retryNote}>
-              TB classification: Simulated · Cough events: Real microphone{'\n'}
+              TB classification: Simulated model v0.1.0 · Cough events: Real microphone{'\n'}
               If you skip, the cough result will be marked insufficient (GREY adjunct).
             </Text>
             <Pressable
@@ -467,7 +594,6 @@ export default function ScanWorkflow() {
             </Pressable>
           </View>
 
-          {/* Voice command status — only shown when recognition is available */}
           {vcState !== 'not_checked' && vcState !== 'unavailable' && (
             <View style={styles.vcStatusRow}>
               <MaterialIcons
@@ -528,7 +654,7 @@ export default function ScanWorkflow() {
           demoMode={demoMode}
           color="#A855F7"
           showWaveform={false} showCoughWaveform={true} showTremorWaveform={false}
-          extraBadge="HeAR model · 94% accuracy (TB: Simulated)"
+          extraBadge="HeAR model · 94% accuracy (TB: Simulated model v0.1.0)"
           coughCount={coughCount}
           latestDbfs={latestDbfs}
           coughInsufficient={coughInsufficient}
@@ -601,14 +727,15 @@ export default function ScanWorkflow() {
           </Animated.View>
           <Text style={styles.processingTitle}>Analysing Results</Text>
           <Text style={styles.processingSubtitle}>
-            Simulated AI inference · Clinical output labelled below · No data transmitted
+            Running model registry · 5 modules · All simulated · No data transmitted
           </Text>
           <View style={styles.processingChecks}>
             {[
-              'Cough events detected: real microphone',
-              'Tremor: real accelerometer',
-              'TB / AFib / SpO₂: simulated (labelled)',
-              'Generating report',
+              'tb_cough v0.1.0 — simulated',
+              'anaemia v0.1.0 — simulated',
+              'bioacoustic v0.1.0 — simulated',
+              'jaundice v0.0.1 — investigational (adjunct)',
+              'cardiac_ppg v0.0.1 — investigational (adjunct)',
             ].map((label) => (
               <View key={label} style={styles.checkRow}>
                 <MaterialIcons name="check-circle" size={16} color={theme.statusGreen} />
@@ -702,7 +829,7 @@ function ScanStep({
             </Text>
           ) : null}
           <Text style={[styles.waveformLabel, { color }]}>
-            COUGH EVENTS: REAL MIC · TB CLASSIFICATION: SIMULATED
+            COUGH EVENTS: REAL MIC · TB CLASSIFICATION: SIMULATED MODEL v0.1.0
           </Text>
         </View>
       ) : null}
@@ -841,7 +968,7 @@ const styles = StyleSheet.create({
   processingSubtitle: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
   processingChecks: { gap: 12, width: '100%' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  checkText: { fontSize: 15, color: theme.textPrimary, fontWeight: '500' },
+  checkText: { fontSize: 14, color: theme.textPrimary, fontWeight: '500' },
   retryCard: {
     backgroundColor: theme.surface, borderRadius: theme.radius.large,
     padding: 28, gap: 16, borderWidth: 1, borderColor: theme.statusYellow + '55',

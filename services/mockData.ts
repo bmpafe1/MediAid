@@ -22,6 +22,8 @@ export interface ScanResult {
   bypassLogged: boolean;
   bypassReason?: string;
   synced: boolean;
+  /** Module registry metadata attached by the scan pipeline (PROMPT 7) */
+  moduleVersions?: Record<string, string>;
 }
 
 export interface OutbreakAlert {

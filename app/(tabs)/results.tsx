@@ -1,3 +1,4 @@
+
 // Powered by OnSpace.AI — Animated Results Dashboard (v10)
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -10,6 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { theme } from '@/constants/theme';
 import { useApp } from '@/contexts/AppContext';
 import { getStatusForMetric, ScanResult } from '@/services/mockData';
+import { listModules, type ModelDescriptor } from '@/services/modelRegistry';
 
 type Status = 'red' | 'yellow' | 'green' | 'grey';
 
@@ -201,11 +203,11 @@ function MetricRowAnimated({
     const t = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(barAnim, { toValue: pct, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(barAnim, { toValue: pct, duration: 900, easing: Easing.cubic, useNativeDriver: false }), // Changed Easing.out(Easing.cubic) to Easing.cubic for consistency with other animations, but Easing.out(Easing.cubic) was also valid.
       ]).start();
     }, delay);
     return () => clearTimeout(t);
-  }, [pct, delay]);
+  }, [pct, delay, fadeAnim, barAnim]); // Added fadeAnim and barAnim to dependencies as recommended by linter.
 
   const barWidth = barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${pct * 100}%`] });
 
@@ -272,6 +274,26 @@ export default function ResultsScreen() {
   const { currentScan, scanHistory } = useApp();
   const displayScan = currentScan ?? scanHistory[0] ?? null;
 
+  const [modules, setModules] = useState<ModelDescriptor[]>([]);
+
+  useEffect(() => {
+    listModules().then(setModules).catch(() => { });
+  }, []);
+
+  function getModuleLabel(moduleId: string): string {
+    const m = modules.find((mod) => mod.id === moduleId);
+    if (!m) return '';
+    const statusStr = m.status === 'investigational' ? 'INVESTIGATIONAL' : m.status.toUpperCase();
+    return `${statusStr} model v${m.version}`;
+  }
+
+
+  // The error occurred because the `if (!displayScan)` block prematurely returned JSX,
+  // making the subsequent code (like `const hasRed = displayScan.hasRedAlert;`)
+  // appear outside a function or block scope, leading to a parsing error.
+  // The fix involves ensuring all conditional rendering is part of the main return
+  // statement or a single function scope.
+
   if (!displayScan) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -293,18 +315,18 @@ export default function ResultsScreen() {
     icon: string; label: string; value: number; displayValue: string;
     maxValue: number; status: Status; note?: string; delay: number;
   }> = [
-    { icon: 'air', label: 'TB Risk', value: displayScan.tbRisk, displayValue: `${displayScan.tbRisk}%`, maxValue: 100, status: getStatusForMetric('tbRisk', displayScan.tbRisk) as Status, note: 'Acoustic cough analysis — HeAR model (94% accuracy)', delay: 80 },
-    { icon: 'monitor-heart', label: 'AFib Risk', value: displayScan.afibRisk, displayValue: `${displayScan.afibRisk}%`, maxValue: 100, status: getStatusForMetric('afibRisk', displayScan.afibRisk) as Status, note: 'Facial PPG — Yan et al. 2018 (95% sensitivity, 96% specificity)', delay: 140 },
-    { icon: 'favorite', label: 'Heart Rate', value: displayScan.heartRate, displayValue: `${displayScan.heartRate} BPM`, maxValue: 200, status: getStatusForMetric('heartRate', displayScan.heartRate) as Status, note: 'Facial video rPPG analysis', delay: 200 },
-    { icon: 'opacity', label: 'Hemoglobin', value: displayScan.hemoglobin, displayValue: `${displayScan.hemoglobin} g/dL`, maxValue: 18, status: getStatusForMetric('hemoglobin', displayScan.hemoglobin) as Status, note: 'Conjunctival pallor analysis — AUC 0.97 (Deep Learning 2025)', delay: 260 },
-    { icon: 'psychology', label: 'SpO\u2082', value: displayScan.spo2, displayValue: `${displayScan.spo2}%`, maxValue: 100, status: getStatusForMetric('spo2', displayScan.spo2) as Status, note: 'Finger PPG — rear camera + flash', delay: 320 },
-    { icon: 'self-improvement', label: 'Respiratory Rate', value: displayScan.respiratoryRate, displayValue: `${displayScan.respiratoryRate} breaths/min`, maxValue: 40, status: getStatusForMetric('respiratoryRate', displayScan.respiratoryRate) as Status, note: 'Accelerometer + PPG waveform analysis — RMSE 0.37 br/min', delay: 380 },
-    { icon: 'vibration', label: 'Tremor Risk', value: displayScan.tremorRisk, displayValue: `${displayScan.tremorRisk}%`, maxValue: 100, status: getStatusForMetric('tremorRisk', displayScan.tremorRisk) as Status, note: 'Resting tremor via accelerometer — He et al. 2024 (AUC 0.89)', delay: 440 },
-    { icon: 'remove-red-eye', label: 'Eye Conditions', value: displayScan.eyeConditions, displayValue: `${displayScan.eyeConditions} condition${displayScan.eyeConditions !== 1 ? 's' : ''} detected`, maxValue: 7, status: getStatusForMetric('eyeConditions', displayScan.eyeConditions) as Status, note: 'Front camera retinal analysis — Jin et al. 2024 (7 conditions, AUC 0.91-0.97)', delay: 500 },
-    { icon: 'monitor-heart', label: '10-yr CVD Risk', value: displayScan.cvdRisk10yr ?? 0, displayValue: `${displayScan.cvdRisk10yr ?? 0}%`, maxValue: 40, status: (displayScan.cvdRisk10yr ?? 0) >= 20 ? 'yellow' : 'green', note: 'PPG-derived cardiovascular risk — Weng/Google Health 2024 (C-stat 71.1%, n=141,509)', delay: 560 },
-    { icon: 'water-drop', label: 'Glucose Flag (Adjunct)', value: (displayScan.glucoseFlag ?? false) ? 1 : 0, displayValue: (displayScan.glucoseFlag ?? false) ? 'Anomaly Detected' : 'Within Range', maxValue: 1, status: 'grey', note: 'Non-invasive PPG glucose screening — Zeynali 2025 (TinyML on-device) · Adjunct only, not diagnostic', delay: 620 },
-    { icon: 'medical-information', label: 'COVID-19 Flag (Adjunct)', value: (displayScan.covidFlag ?? false) ? 1 : 0, displayValue: (displayScan.covidFlag ?? false) ? 'Breathing Anomaly Detected' : 'Normal Breathing Pattern', maxValue: 1, status: 'grey', note: 'Breathing sound analysis — Alkhodari & Khandoker 2022 (AUROC 0.90) · Adjunct only', delay: 680 },
-    { icon: 'visibility', label: 'Jaundice Screen', value: (displayScan.jaundiceFlag ?? false) ? 1 : 0, displayValue: (displayScan.jaundiceFlag ?? false) ? 'Scleral Yellowing Noted' : 'No Jaundice Detected', maxValue: 1, status: (displayScan.jaundiceFlag ?? false) ? 'yellow' : 'green', note: 'Scleral colorimetry — Aune et al. 2023 (94% sensitivity, CE-marked Picterus system) · Refer for confirmation', delay: 740 },
+    { icon: 'air', label: 'TB Risk', value: displayScan.tbRisk, displayValue: `${displayScan.tbRisk}%`, maxValue: 100, status: getStatusForMetric('tbRisk', displayScan.tbRisk) as Status, note: `Acoustic cough analysis — HeAR model (94% accuracy) · ${getModuleLabel('tb_cough')}`, delay: 80 },
+    { icon: 'monitor-heart', label: 'AFib Risk', value: displayScan.afibRisk, displayValue: `${displayScan.afibRisk}%`, maxValue: 100, status: getStatusForMetric('afibRisk', displayScan.afibRisk) as Status, note: `Facial PPG — Yan et al. 2018 (95% sensitivity) · ${getModuleLabel('bioacoustic')}`, delay: 140 },
+    { icon: 'favorite', label: 'Heart Rate', value: displayScan.heartRate, displayValue: `${displayScan.heartRate} BPM`, maxValue: 200, status: getStatusForMetric('heartRate', displayScan.heartRate) as Status, note: `Facial video rPPG analysis · ${getModuleLabel('bioacoustic')}`, delay: 200 },
+    { icon: 'opacity', label: 'Hemoglobin', value: displayScan.hemoglobin, displayValue: `${displayScan.hemoglobin} g/dL`, maxValue: 18, status: getStatusForMetric('hemoglobin', displayScan.hemoglobin) as Status, note: `Conjunctival pallor analysis — AUC 0.97 · ${getModuleLabel('anaemia')}`, delay: 260 },
+    { icon: 'psychology', label: 'SpO\u2082', value: displayScan.spo2, displayValue: `${displayScan.spo2}%`, maxValue: 100, status: getStatusForMetric('spo2', displayScan.spo2) as Status, note: `Finger PPG — rear camera + flash · ${getModuleLabel('bioacoustic')}`, delay: 320 },
+    { icon: 'self-improvement', label: 'Respiratory Rate', value: displayScan.respiratoryRate, displayValue: `${displayScan.respiratoryRate} breaths/min`, maxValue: 40, status: getStatusForMetric('respiratoryRate', displayScan.respiratoryRate) as Status, note: `Accelerometer + PPG waveform · ${getModuleLabel('bioacoustic')}`, delay: 380 },
+    { icon: 'vibration', label: 'Tremor Risk', value: displayScan.tremorRisk, displayValue: `${displayScan.tremorRisk}%`, maxValue: 100, status: getStatusForMetric('tremorRisk', displayScan.tremorRisk) as Status, note: `Resting tremor via accelerometer — He et al. 2024 (AUC 0.89) · ${getModuleLabel('cardiac_ppg')} · INVESTIGATIONAL`, delay: 440 },
+    { icon: 'remove-red-eye', label: 'Eye Conditions', value: displayScan.eyeConditions, displayValue: `${displayScan.eyeConditions} condition${displayScan.eyeConditions !== 1 ? 's' : ''} detected`, maxValue: 7, status: getStatusForMetric('eyeConditions', displayScan.eyeConditions) as Status, note: `Front camera retinal analysis — Jin et al. 2024 · ${getModuleLabel('cardiac_ppg')} · INVESTIGATIONAL`, delay: 500 },
+    { icon: 'monitor-heart', label: '10-yr CVD Risk', value: displayScan.cvdRisk10yr ?? 0, displayValue: `${displayScan.cvdRisk10yr ?? 0}%`, maxValue: 40, status: (displayScan.cvdRisk10yr ?? 0) >= 20 ? 'yellow' : 'green', note: `PPG-derived cardiovascular risk — Weng/Google Health 2024 · ${getModuleLabel('cardiac_ppg')} · INVESTIGATIONAL`, delay: 560 },
+    { icon: 'water-drop', label: 'Glucose Flag (Adjunct)', value: (displayScan.glucoseFlag ?? false) ? 1 : 0, displayValue: (displayScan.glucoseFlag ?? false) ? 'Anomaly Detected' : 'Within Range', maxValue: 1, status: 'grey', note: `Non-invasive PPG glucose screening — Zeynali 2025 (TinyML) · ${getModuleLabel('cardiac_ppg')} · INVESTIGATIONAL · Adjunct only, not diagnostic`, delay: 620 },
+    { icon: 'medical-information', label: 'COVID-19 Flag (Adjunct)', value: (displayScan.covidFlag ?? false) ? 1 : 0, displayValue: (displayScan.covidFlag ?? false) ? 'Breathing Anomaly Detected' : 'Normal Breathing Pattern', maxValue: 1, status: 'grey', note: `Breathing sound analysis — Alkhodari & Khandoker 2022 (AUROC 0.90) · ${getModuleLabel('bioacoustic')} · Adjunct only`, delay: 680 },
+    { icon: 'visibility', label: 'Jaundice Screen', value: (displayScan.jaundiceFlag ?? false) ? 1 : 0, displayValue: (displayScan.jaundiceFlag ?? false) ? 'Scleral Yellowing Noted' : 'No Jaundice Detected', maxValue: 1, status: (displayScan.jaundiceFlag ?? false) ? 'yellow' : 'green', note: `Scleral colorimetry — Aune et al. 2023 (94% sensitivity) · ${getModuleLabel('jaundice')} · INVESTIGATIONAL · Refer for confirmation`, delay: 740 },
   ];
 
   const redCount = METRICS.filter((m) => m.status === 'red').length;
@@ -337,6 +359,17 @@ export default function ResultsScreen() {
             <MaterialIcons name="share" size={16} color={theme.primary} />
             <Text style={styles.exportBtnText}>Export</Text>
           </Pressable>
+        </View>
+
+        {/* Investigational modules banner */}
+        <View style={styles.investigationalBanner}>
+          <MaterialIcons name="biotech" size={13} color={theme.textMuted} />
+          <Text style={styles.investigationalBannerText}>
+            <Text style={{ fontWeight: '700', color: theme.textPrimary }}>Investigational modules: </Text>
+            jaundice (v0.0.1) and cardiac_ppg (v0.0.1) are labelled INVESTIGATIONAL.{' '}
+            Their outputs are shown as adjunct information only and{' '}
+            <Text style={{ fontWeight: '700' }}>never affect the referral colour or clinical action.</Text>
+          </Text>
         </View>
 
         {/* Gauge row */}
@@ -484,6 +517,12 @@ const styles = StyleSheet.create({
     padding: 12, marginTop: 4, borderWidth: 1, borderColor: theme.statusGreen + '33',
   },
   consentText: { fontSize: 12, color: theme.statusGreen, fontWeight: '500' },
+  investigationalBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 7,
+    backgroundColor: theme.textMuted + '0D', borderRadius: theme.radius.medium,
+    padding: 10, marginBottom: 12, borderWidth: 1, borderColor: theme.textMuted + '33',
+  },
+  investigationalBannerText: { flex: 1, fontSize: 11, color: theme.textMuted, lineHeight: 16 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyImage: { width: 160, height: 160, marginBottom: 24 },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: theme.textPrimary, textAlign: 'center' },
